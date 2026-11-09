@@ -18,8 +18,8 @@ compatibilidade universal de formatos ou execução gráfica em todos os sistema
 ## Obter o código
 
 ```sh
-git clone https://github.com/Prandini-Kaio/noah-2.0.git
-cd noah-2.0
+git clone https://github.com/Prandini-Kaio/noah.git
+cd noah
 ```
 
 Também é possível baixar em **Code → Download ZIP**.
