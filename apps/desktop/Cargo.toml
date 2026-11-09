@@ -1,0 +1,10 @@
+[package]
+name = "noah-desktop"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+noah-workspace = { path = "../../crates/workspace" }
+noah-geometry = { path = "../../crates/geometry" }
+eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "x11"] }

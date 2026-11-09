@@ -1,0 +1,8 @@
+/target/
+**/*.tmp
+**/*.log
+.DS_Store
+.idea/
+.vscode/
+# Datasets locais grandes e dados privados
+/local-data/

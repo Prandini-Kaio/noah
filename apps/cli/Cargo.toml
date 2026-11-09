@@ -1,0 +1,16 @@
+[package]
+name = "noah-cli"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[[bin]]
+name = "noah"
+path = "src/main.rs"
+
+[dependencies]
+noah-core = { path = "../../crates/core" }
+noah-geometry = { path = "../../crates/geometry" }
+noah-storage = { path = "../../crates/storage" }
+noah-pipeline = { path = "../../crates/pipeline" }
+noah-photogrammetry = { path = "../../crates/photogrammetry" }

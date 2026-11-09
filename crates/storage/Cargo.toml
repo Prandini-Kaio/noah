@@ -1,0 +1,13 @@
+[package]
+name = "noah-storage"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+noah-core = { path = "../core" }
+noah-geometry = { path = "../geometry" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }

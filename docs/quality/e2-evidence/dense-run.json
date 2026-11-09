@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "run_id": "a9715ed0-709b-449e-a638-bb532c0b65e9",
+  "started_ms": 1794265967917,
+  "finished_ms": 1794266009794,
+  "status": "failed",
+  "engine": "/workspace/work/colmap-tools/colmap",
+  "engine_version": "COLMAP 3.11.1 -- Structure-from-Motion and Multi-View Stereo",
+  "parameters": {
+    "feature_gpu": "false",
+    "matching_gpu": "false",
+    "max_image_size": "1600",
+    "mode": "dense",
+    "threads": "2",
+    "timeout_ms": "180000"
+  },
+  "inputs": [
+    {
+      "original_name": "view-00.png",
+      "snapshot": "images/0000.png",
+      "sha256": "8acc6a2a1b9909da5709fedff6003639ff989accace26692e10e619fa7e1796b",
+      "bytes": 144374
+    },
+    {
+      "original_name": "view-01.png",
+      "snapshot": "images/0001.png",
+      "sha256": "cc6d7b7462f3ddd74ac5037dd8745b9200b4562d5fa0b81b536b0ccd4d0f7925",
+      "bytes": 141503
+    },
+    {
+      "original_name": "view-02.png",
+      "snapshot": "images/0002.png",
+      "sha256": "59290bee12f50194b0f493e3f179148e839607319d8775e9672bfa687f4464a1",
+      "bytes": 137768
+    },
+    {
+      "original_name": "view-03.png",
+      "snapshot": "images/0003.png",
+      "sha256": "d3bd95162f7ed0b167a0ca40986f78696a3e6fe4f5c9b91ba126b4557d3d5ec5",
+      "bytes": 135301
+    },
+    {
+      "original_name": "view-04.png",
+      "snapshot": "images/0004.png",
+      "sha256": "684dc6e5a063597f40acbd4b21632449e0232a7d3b2b287726c522e91a4d5026",
+      "bytes": 134456
+    },
+    {
+      "original_name": "view-05.png",
+      "snapshot": "images/0005.png",
+      "sha256": "cddd9b6559f854e7df0cfd87f63169fd87f36620df063429a9147932debef9c8",
+      "bytes": 131781
+    },
+    {
+      "original_name": "view-06.png",
+      "snapshot": "images/0006.png",
+      "sha256": "f0bdb31aaa3132a0e2394f630eeafdad415403637798bb4923435dd9191fe8c0",
+      "bytes": 130177
+    },
+    {
+      "original_name": "view-07.png",
+      "snapshot": "images/0007.png",
+      "sha256": "8471b7d990bf16dfd863b991fc08ded8fc5b4aab7b786b3538392a4b004f20d3",
+      "bytes": 131765
+    },
+    {
+      "original_name": "view-08.png",
+      "snapshot": "images/0008.png",
+      "sha256": "0c9ff3463d07b0712fa28a4c7a990c4480a63f3478a6ddc8d8c57774272c9571",
+      "bytes": 132878
+    },
+    {
+      "original_name": "view-09.png",
+      "snapshot": "images/0009.png",
+      "sha256": "8f17cbf467d95fe24550dab699307cb54834a1a266447eaf00b6b0c7dc80a745",
+      "bytes": 135764
+    },
+    {
+      "original_name": "view-10.png",
+      "snapshot": "images/0010.png",
+      "sha256": "ae412b68b33138d5386dc845b5961d310d9931c5b6ac63465425261dccd1dd3a",
+      "bytes": 139647
+    },
+    {
+      "original_name": "view-11.png",
+      "snapshot": "images/0011.png",
+      "sha256": "f71f2035fbc93477444ab0c24edf26769cdaa4be361dbf2f9855686ed5ff50a3",
+      "bytes": 143482
+    }
+  ],
+  "steps": [
+    {
+      "name": "version",
+      "arguments": [
+        "--help"
+      ],
+      "started_ms": 1794265967975,
+      "finished_ms": 1794265968000,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/00-version.stdout.log",
+      "stderr": "logs/00-version.stderr.log"
+    },
+    {
+      "name": "features",
+      "arguments": [
+        "feature_extractor",
+        "--database_path",
+        "/workspace/work/e2-real-dense/database.db",
+        "--image_path",
+        "/workspace/work/e2-real-dense/images",
+        "--ImageReader.camera_model",
+        "SIMPLE_RADIAL",
+        "--SiftExtraction.use_gpu",
+        "0",
+        "--SiftExtraction.num_threads",
+        "2",
+        "--SiftExtraction.max_image_size",
+        "1600"
+      ],
+      "started_ms": 1794265968002,
+      "finished_ms": 1794265972163,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/01-features.stdout.log",
+      "stderr": "logs/01-features.stderr.log"
+    },
+    {
+      "name": "matching",
+      "arguments": [
+        "exhaustive_matcher",
+        "--database_path",
+        "/workspace/work/e2-real-dense/database.db",
+        "--SiftMatching.use_gpu",
+        "0",
+        "--SiftMatching.num_threads",
+        "2"
+      ],
+      "started_ms": 1794265972164,
+      "finished_ms": 1794265988737,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/02-matching.stdout.log",
+      "stderr": "logs/02-matching.stderr.log"
+    },
+    {
+      "name": "mapping",
+      "arguments": [
+        "mapper",
+        "--database_path",
+        "/workspace/work/e2-real-dense/database.db",
+        "--image_path",
+        "/workspace/work/e2-real-dense/images",
+        "--output_path",
+        "/workspace/work/e2-real-dense/sparse",
+        "--Mapper.num_threads",
+        "2"
+      ],
+      "started_ms": 1794265988738,
+      "finished_ms": 1794266008511,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/03-mapping.stdout.log",
+      "stderr": "logs/03-mapping.stderr.log"
+    },
+    {
+      "name": "convert_0",
+      "arguments": [
+        "model_converter",
+        "--input_path",
+        "/workspace/work/e2-real-dense/sparse/0",
+        "--output_path",
+        "/workspace/work/e2-real-dense/model-0",
+        "--output_type",
+        "TXT"
+      ],
+      "started_ms": 1794266008512,
+      "finished_ms": 1794266008618,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/04-convert_0.stdout.log",
+      "stderr": "logs/04-convert_0.stderr.log"
+    },
+    {
+      "name": "undistort",
+      "arguments": [
+        "image_undistorter",
+        "--image_path",
+        "/workspace/work/e2-real-dense/images",
+        "--input_path",
+        "/workspace/work/e2-real-dense/sparse/0",
+        "--output_path",
+        "/workspace/work/e2-real-dense/dense",
+        "--output_type",
+        "COLMAP",
+        "--max_image_size",
+        "1600"
+      ],
+      "started_ms": 1794266008961,
+      "finished_ms": 1794266009765,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/05-undistort.stdout.log",
+      "stderr": "logs/05-undistort.stderr.log"
+    },
+    {
+      "name": "patch_match",
+      "arguments": [
+        "patch_match_stereo",
+        "--workspace_path",
+        "/workspace/work/e2-real-dense/dense",
+        "--workspace_format",
+        "COLMAP",
+        "--PatchMatchStereo.geom_consistency",
+        "true"
+      ],
+      "started_ms": 1794266009767,
+      "finished_ms": 1794266009793,
+      "exit_code": 1,
+      "status": "failed",
+      "diagnostic": "processo falhou: exit status: 1",
+      "stdout": "logs/06-patch_match.stdout.log",
+      "stderr": "logs/06-patch_match.stderr.log"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "exports/sparse.ply",
+      "kind": "sparse_point_cloud",
+      "sha256": "662964f3b76ac7c3a9b7de976f1748bacedd3527e66594407b7356eabd7af0c6",
+      "bytes": 512470
+    },
+    {
+      "path": "exports/reconstruction.json",
+      "kind": "cameras_and_poses",
+      "sha256": "9e8c21e5ae882fd3e3b58b4f9dd6084bd89362e8df4cdd9104b09547b11cde6f",
+      "bytes": 82806
+    },
+    {
+      "path": "model-0/cameras.txt",
+      "kind": "colmap_text_model",
+      "sha256": "eabdfae503fe41c99c91a61d5dd9d77b5088ee16cda6edc7cd2ee02d27357ab7",
+      "bytes": 996
+    },
+    {
+      "path": "model-0/images.txt",
+      "kind": "colmap_text_model",
+      "sha256": "7dced457106718c080b8aaee6b5cdf2bd8570600fde7cd6b0fd172a33e51b231",
+      "bytes": 2898663
+    },
+    {
+      "path": "model-0/points3D.txt",
+      "kind": "colmap_text_model",
+      "sha256": "0222c03e36feeb9b0af2ff9ae1b736d7abaadb3e9618dfa1ecae7be31994194e",
+      "bytes": 1097123
+    }
+  ],
+  "diagnostic": "patch_match: processo falhou: exit status: 1; consulte logs/06-patch_match.stderr.log"
+}

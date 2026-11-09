@@ -1,0 +1,9 @@
+12 imagens sintéticas geradas em /workspace/work/e2-demo-final/images
+run concluído; exports em /workspace/work/e2-demo-final/run/exports
+run_id=b16b22a5-f94f-42a3-9d1b-2dd8de0a6909 status=Succeeded images=12 steps=5 artifacts=5 engine=Some("COLMAP 3.11.1 -- Structure-from-Motion and Multi-View Stereo") diagnostic=None
+step=version status=Succeeded exit=Some(0) diagnostic=None stdout=logs/00-version.stdout.log stderr=logs/00-version.stderr.log
+step=features status=Succeeded exit=Some(0) diagnostic=None stdout=logs/01-features.stdout.log stderr=logs/01-features.stderr.log
+step=matching status=Succeeded exit=Some(0) diagnostic=None stdout=logs/02-matching.stdout.log stderr=logs/02-matching.stderr.log
+step=mapping status=Succeeded exit=Some(0) diagnostic=None stdout=logs/03-mapping.stdout.log stderr=logs/03-mapping.stderr.log
+step=convert_0 status=Succeeded exit=Some(0) diagnostic=None stdout=logs/04-convert_0.stdout.log stderr=logs/04-convert_0.stderr.log
+Demo passou: 12/12 imagens, 7592 pontos; originais preservados

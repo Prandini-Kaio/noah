@@ -1,0 +1,15 @@
+ply
+format ascii 1.0
+comment NOAH synthetic reference; CC0-1.0
+comment frame and units intentionally not encoded
+element vertex 3
+property double x
+property double y
+property double z
+property uchar red
+property uchar green
+property uchar blue
+end_header
+1 0 2 255 0 0
+0 1 0 0 255 0
+0 0 0 0 0 255
