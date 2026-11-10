@@ -39,3 +39,10 @@ documentadas no adaptador; intrínsecos mantêm o nome e a ordem de parâmetros
 suportados pelo COLMAP 3.11. Nenhum tipo de libcolmap é importado pelo domínio.
 Run schema 1 é separado de Project schema 1. A E2 não atribui referencial
 canônico nem calibração ao resultado e não altera a origem PLY exigida por E1.
+
+## Incremento de interface e montagens
+Desktop orquestra noah-photogrammetry em thread de trabalho e lê status local
+sem revalidar fotos a cada frame; a abertura final valida os artefatos.
+Workspace compõe hierarquia e deslocamentos de explosão e persiste sessão 2;
+domínio geométrico permanece independente da UI. Projetos E1/runs E2 não mudam
+de schema. Explosão afeta apenas visualização; export de peça usa estado montado.

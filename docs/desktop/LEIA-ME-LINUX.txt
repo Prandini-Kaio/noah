@@ -1,0 +1,56 @@
+NOAH 2.0 — Prévia da interface e montagens
+
+COMO ABRIR
+Extraia toda a pasta e abra o arquivo executável NOAH com duplo clique.
+Não precisa instalar Rust/Cargo ou abrir terminal para usar esse pacote.
+Caso o gerenciador de arquivos pergunte, escolha executar o arquivo.
+
+REQUISITOS DESTE BINÁRIO
+Linux x86_64, glibc 2.39 ou superior (ex.: Ubuntu 24.04 / Debian 13),
+sessão gráfica X11 ou XWayland, bibliotecas X11/xkbcommon e OpenGL.
+Não é AppImage nem pacote universal para todas as distribuições.
+Se sua distribuição for mais antiga, compilar o código nela é alternativa
+para desenvolvedores. Não foi validado suporte nativo Wayland nesta prévia.
+
+PRIMEIRO CONTATO
+1. Clique em Explorar montagem de exemplo.
+2. Escolha uma pasta para materializar os arquivos da demonstração.
+3. Clique Criar montagem: dez peças e três montagens serão abertas.
+4. Use Montada e Explodida ou o controle de intensidade.
+5. Selecione peças/montagens e use os ajustes do inspetor.
+6. Salvar revisão cria um arquivo novo; Abrir workspace restaura a sessão.
+
+SEUS ARQUIVOS
+Importar peças abre nuvens PLY ASCII XYZ/RGB e malhas OBJ triangulares.
+Projeto/run abre diretórios de projetos E1 e reconstruções E2 finalizadas.
+A estrutura à esquerda permite selecionar/ocultar peças. Crie montagens
+com o botão abaixo da árvore; no inspetor, escolha o pai de cada componente.
+A troca de pai preserva coordenadas locais, podendo mudar a posição mundial.
+
+NAVEGAÇÃO
+Arrastar: órbita. Botão direito ou Shift + arrastar: pan. Roda: zoom.
+F ou Enquadrar: ajustar câmera. Clique em uma peça ou na árvore para selecionar.
+
+RECONSTRUÇÃO
+Reconstruir fotos permite escolher a pasta das imagens, o executável COLMAP,
+a pasta de resultados e um nome novo. Inicie, acompanhe etapas e logs, cancele
+se necessário e use Abrir nuvem no workspace ao concluir.
+COLMAP 3.11.x deve estar instalado separadamente; ele não vem neste pacote.
+Modo esparso usa CPU. Densificação requer COLMAP CUDA e GPU compatível;
+sua validação real ainda está pendente. O app não baixa motores nem fotos.
+
+DADOS E LIMITES
+Geometria original é preservada. A explosão é apenas visual; exportação da
+peça usa a posição montada e grava metadados de unidade/referencial.
+Sessões referenciam caminhos absolutos das fontes. Não mova/apague essas
+fontes depois de salvar. Não é um arquivo autocontido de projeto.
+Montagem é manual; não há reconhecimento automático ou restrições CAD.
+Renderer tem oclusão aproximada e exibe até 50 mil pontos/20 mil faces.
+Unidades desconhecidas não são calibradas automaticamente.
+Este é software de desenvolvimento, com testes e pendências documentados.
+
+LICENÇA
+Código original MIT. Demo sintética CC0-1.0. Dependências mantêm suas licenças,
+incluídas na pasta third-party-licenses. COLMAP é um motor externo separado.
+
+Código e relatórios: https://github.com/Prandini-Kaio/noah

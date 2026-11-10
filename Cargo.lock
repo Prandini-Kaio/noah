@@ -1317,7 +1317,11 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "noah-geometry",
+ "noah-photogrammetry",
+ "noah-pipeline",
+ "noah-storage",
  "noah-workspace",
+ "serde_json",
 ]
 
 [[package]]

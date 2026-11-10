@@ -7,8 +7,14 @@ use std::{collections::HashSet, path::Path};
 #[serde(deny_unknown_fields)]
 struct Entity {
     id: String,
+    #[serde(default)]
+    name: Option<String>,
     placement: Placement,
     visible: bool,
+    #[serde(default)]
+    parent: Option<String>,
+    #[serde(default)]
+    explode_direction: [f64; 3],
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -21,17 +27,25 @@ struct Session {
     point_size: f32,
     grid: bool,
     wireframe: bool,
+    #[serde(default)]
+    assemblies: Vec<crate::Assembly>,
+    #[serde(default)]
+    explosion: f64,
+    #[serde(default = "default_distance")]
+    explosion_distance: f64,
+}
+fn default_distance() -> f64 {
+    1.
 }
 fn validate_options(scene: &Scene) -> Result<()> {
     scene.camera.validate()?;
+    scene.validate_world()?;
     if !scene.point_size.is_finite() || !(1.0..=8.0).contains(&scene.point_size) {
         return Err("tamanho de ponto inválido".into());
     }
-    if scene
-        .selected
-        .as_ref()
-        .is_some_and(|id| !scene.items.iter().any(|i| &i.id == id))
-    {
+    if scene.selected.as_ref().is_some_and(|id| {
+        !scene.items.iter().any(|i| &i.id == id) && !scene.assemblies.iter().any(|g| &g.id == id)
+    }) {
         return Err("seleção ausente na cena".into());
     }
     Ok(())
@@ -47,15 +61,18 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
         item.validate()?;
     }
     let session = Session {
-        schema_version: 1,
+        schema_version: 2,
         sources: scene.sources.clone(),
         entities: scene
             .items
             .iter()
             .map(|i| Entity {
                 id: i.id.clone(),
+                name: Some(i.name.clone()),
                 placement: i.placement.clone(),
                 visible: i.visible,
+                parent: i.parent.clone(),
+                explode_direction: i.explode_direction,
             })
             .collect(),
         camera: scene.camera.clone(),
@@ -63,6 +80,9 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
         point_size: scene.point_size,
         grid: scene.grid,
         wireframe: scene.wireframe,
+        assemblies: scene.assemblies.clone(),
+        explosion: scene.explosion,
+        explosion_distance: scene.explosion_distance,
     };
     let bytes = serde_json::to_vec_pretty(&session)?;
     if bytes.len() > 4 * 1024 * 1024 {
@@ -72,7 +92,10 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
 }
 pub fn load(path: &Path) -> Result<Scene> {
     let saved: Session = serde_json::from_slice(&read_bounded(path, 4 * 1024 * 1024)?)?;
-    if saved.schema_version != 1 || saved.sources.len() > 32 || saved.entities.len() > 1000 {
+    if !matches!(saved.schema_version, 1 | 2)
+        || saved.sources.len() > 32
+        || saved.entities.len() > 1000
+    {
         return Err("schema/limites de sessão inválidos".into());
     }
     let mut scene = Scene::default();
@@ -98,10 +121,21 @@ pub fn load(path: &Path) -> Result<Scene> {
             .iter_mut()
             .find(|i| i.id == entity.id)
             .ok_or("objeto da sessão não encontrado")?;
+        if let Some(name) = entity.name {
+            if name.trim().is_empty() || name.len() > 256 {
+                return Err("nome de peça inválido".into());
+            }
+            item.name = name;
+        }
         item.placement = entity.placement;
         item.visible = entity.visible;
+        item.parent = entity.parent;
+        item.explode_direction = entity.explode_direction;
         item.validate()?;
     }
+    scene.assemblies = saved.assemblies;
+    scene.explosion = saved.explosion;
+    scene.explosion_distance = saved.explosion_distance;
     scene.camera = saved.camera;
     scene.selected = saved.selected;
     scene.point_size = saved.point_size;
