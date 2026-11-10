@@ -1,4 +1,5 @@
 use eframe::egui::{self, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, Vec2};
+use noah_workspace::measurement::{self, Anchor, LengthUnit};
 use noah_workspace::{Geometry, Placement, Scene, session};
 use std::{
     path::{Path, PathBuf},
@@ -34,6 +35,13 @@ struct Desktop {
     show_logs: bool,
     log_text: String,
     new_group_name: String,
+    show_measurements: bool,
+    measure_mode: bool,
+    anchors: Vec<Anchor>,
+    measure_name: String,
+    known_distance: f64,
+    length_unit: LengthUnit,
+    scale_provenance: String,
 }
 impl Desktop {
     fn new(cc: &eframe::CreationContext<'_>, scene: Scene) -> Self {
@@ -66,6 +74,13 @@ impl Desktop {
             show_logs: false,
             log_text: String::new(),
             new_group_name: "Nova montagem".into(),
+            show_measurements: false,
+            measure_mode: false,
+            anchors: vec![],
+            measure_name: "Distância 1".into(),
+            known_distance: 100.,
+            length_unit: LengthUnit::Millimetre,
+            scale_provenance: "Referência informada pelo usuário".into(),
         }
     }
     fn notice(&mut self, result: noah_workspace::Result<()>, success: &str) {
@@ -107,6 +122,8 @@ impl Desktop {
     fn replace_scene(&mut self, action: Replace) {
         if matches!(action, Replace::New) {
             self.scene = Scene::default();
+            self.anchors.clear();
+            self.measure_mode = false;
             self.dirty = false;
             self.message = "Novo workspace. Importe componentes para começar.".into();
             return;
@@ -152,6 +169,10 @@ impl Desktop {
             Purpose::Images => self.reconstruction.images = path,
             Purpose::Engine => self.reconstruction.engine = path,
             Purpose::Output => self.reconstruction.parent = path,
+            Purpose::ExportMeasurements => {
+                let result = measurement::export_report(&self.scene, &path);
+                self.notice(result, "Relatório de medições exportado.");
+            }
             Purpose::Export => {
                 let result = self
                     .scene
@@ -192,6 +213,9 @@ impl Desktop {
                             let result = self.scene.fit(false);
                             self.notice(result, "Cena enquadrada.");
                             self.dirty = true;
+                        }
+                        if ui.button("Medir").clicked() {
+                            self.show_measurements = true;
                         }
                         if ui.button("Montada").clicked() {
                             self.scene.explosion = 0.;
@@ -390,7 +414,15 @@ if ui.add(egui::Slider::new(&mut self.scene.point_size,1.0..=8.0).text("Pontos /
                 }}
             }
             let primitives=noah_workspace::project(&self.scene,size);self.shown=primitives.len();
-            if response.clicked() && self.pending.is_none()&& let Some(pos)=response.interact_pointer_pos(){self.scene.selected=noah_workspace::pick(&primitives,[(pos.x-rect.left()) as f64,(pos.y-rect.top()) as f64],7.).map(|i|self.scene.items[i].id.clone());self.dirty=true;}
+            if response.clicked() && self.pending.is_none()&& let Some(pos)=response.interact_pointer_pos(){
+                let point=[(pos.x-rect.left()) as f64,(pos.y-rect.top()) as f64];
+                if self.measure_mode{
+                    if let Some(anchor)=measurement::pick_anchor(&self.scene,point,size,12.){
+                        if self.anchors.last()==Some(&anchor){self.notice(Err("Escolha outro vértice para o segundo ponto".into()),"");}
+                        else{self.anchors.push(anchor);if self.anchors.len()==2{self.measure_mode=false;self.notice(Ok(()),"Dois vértices selecionados. Abra Medir para registrar ou definir escala.");}else{self.notice(Ok(()),"Ponto A escolhido; selecione o ponto B.");}}
+                    }else{self.notice(Err("Nenhum vértice próximo. Aproxime a câmera e tente novamente.".into()),"");}
+                }else{self.scene.selected=noah_workspace::pick(&primitives,point,7.).map(|i|self.scene.items[i].id.clone());self.dirty=true;}
+            }
             let mut mesh=egui::Mesh::default();let mut edges=Vec::new();
             for primitive in &primitives{
                 if primitive.pixels.iter().flatten().any(|v|v.abs()>1e7){continue;}
@@ -404,6 +436,17 @@ if ui.add(egui::Slider::new(&mut self.scene.point_size,1.0..=8.0).text("Pontos /
                 }
             }
             painter.add(egui::Shape::mesh(mesh));painter.extend(edges);
+            let visual_transforms=self.scene.world_transforms(true).ok();
+            let anchor_screen=|a:&Anchor|self.scene.items.iter().position(|i|i.id==a.item_id).filter(|&index|self.scene.items[index].visible).and_then(|index|self.scene.items[index].geometry.positions().get(a.vertex).and_then(|&p|visual_transforms.as_ref().and_then(|ts|ts[index].apply(p).ok()))).and_then(|p|self.scene.camera.project(p,size)).map(|p|to_screen([p[0],p[1]]));
+            for measure in &self.scene.measurements{
+                if let (Some(a),Some(b))=(anchor_screen(&measure.a),anchor_screen(&measure.b)){
+                    painter.line_segment([a,b],Stroke::new(1.5_f32,ACCENT));painter.circle_filled(a,3.5,ACCENT);painter.circle_filled(b,3.5,ACCENT);
+                    let label=match self.scene.distance(&measure.a,&measure.b){Ok(d)=>format!("{}: {:.3} {} (montado)",measure.name,d.value,d.unit.map(|u|u.symbol()).unwrap_or("u. cena")),Err(_)=>format!("{}: recalibrar escala",measure.name)};
+                    painter.text(a+(b-a)*0.5,egui::Align2::CENTER_BOTTOM,label,FontId::proportional(11.),ACCENT);
+                }
+            }
+            for (i,a) in self.anchors.iter().enumerate(){if let Some(p)=anchor_screen(a){painter.circle_filled(p,6.,Color32::from_rgb(250,187,94));painter.text(p+Vec2::new(10.,-10.),egui::Align2::LEFT_BOTTOM,if i==0{"A"}else{"B"},FontId::proportional(14.),Color32::WHITE);}}
+            if self.measure_mode{painter.text(rect.center_top()+Vec2::new(0.,25.),egui::Align2::CENTER_TOP,"MEDIÇÃO: clique nos vértices A e B",FontId::proportional(14.),ACCENT);}
             let top=rect.left_top()+Vec2::new(22.,22.);painter.text(top,egui::Align2::LEFT_TOP,"PERSPECTIVA",FontId::proportional(11.),MUTED);
             painter.text(top+Vec2::new(0.,20.),egui::Align2::LEFT_TOP,format!("{} primitivas na tela",self.shown),FontId::proportional(10.),Color32::from_rgb(93,112,133));
             if self.scene.items.is_empty(){let center=rect.center();painter.text(center-Vec2::new(0.,25.),egui::Align2::CENTER_CENTER,"Seu espaço de geometria",FontId::proportional(27.),Color32::from_rgb(190,204,220));painter.text(center+Vec2::new(0.,20.),egui::Align2::CENTER_CENTER,"Abra uma nuvem, malha, projeto ou run para começar.",FontId::proportional(13.),MUTED);}
@@ -451,6 +494,8 @@ impl eframe::App for Desktop {
                     match result {
                         Ok(scene) => {
                             self.scene = scene;
+                            self.anchors.clear();
+                            self.measure_mode = false;
                             self.dirty = !self.pending_session;
                             self.notice(Ok(()), "Workspace aberto e verificado.");
                         }
@@ -501,6 +546,9 @@ impl eframe::App for Desktop {
         self.left(ctx);
         self.inspector(ctx);
         self.viewport(ctx);
+        if self.show_measurements {
+            self.measurement_window(ctx);
+        }
         if self.show_reconstruction {
             self.reconstruction_window(ctx);
         }
@@ -620,4 +668,34 @@ fn main() -> eframe::Result {
         options,
         Box::new(move |cc| Ok(Box::new(Desktop::new(cc, scene)))),
     )
+}
+
+impl Desktop {
+    fn measurement_window(&mut self, ctx: &egui::Context) {
+        let mut open = self.show_measurements;
+        egui::Window::new("Medições e referência de escala").open(&mut open).default_width(440.).default_pos([300.,90.]).show(ctx,|ui|{
+   ui.label("Distância entre vértices no estado montado.");ui.label(RichText::new("A vista explodida não altera o valor medido.").size(11.).color(MUTED));
+   ui.horizontal(|ui|{if ui.button("Escolher pontos A e B").clicked(){self.anchors.clear();self.measure_mode=true;self.notice(Ok(()),"Clique nos vértices da geometria: primeiro A, depois B.");}
+if ui.button("Cancelar seleção").clicked(){self.measure_mode=false;self.anchors.clear();}});
+   for (i,anchor) in self.anchors.iter().enumerate(){let name=self.scene.items.iter().find(|item|item.id==anchor.item_id).map(|i|i.name.as_str()).unwrap_or("Fonte ausente");ui.label(format!("{}: {} / vértice {}",if i==0{"A"}else{"B"},name,anchor.vertex+1));}
+   if self.anchors.len()==2{
+    let a=self.anchors[0].clone();let b=self.anchors[1].clone();
+    match self.scene.distance(&a,&b){Ok(d)=>{ui.heading(format!("{:.4} {}",d.value,d.unit.map(|u|u.symbol()).unwrap_or("unidades da cena")));},Err(e)=>{ui.colored_label(Color32::LIGHT_RED,e.to_string());}}
+    ui.horizontal(|ui|{ui.label("Nome");ui.text_edit_singleline(&mut self.measure_name);});if ui.button("Registrar distância").clicked(){let result=self.scene.add_measurement(a.clone(),b.clone(),self.measure_name.clone());match result{Ok(_)=>{self.dirty=true;self.notice(Ok(()),"Medição registrada com incerteza desconhecida.");},Err(e)=>self.notice(Err(e),"")}}
+    ui.separator();ui.label(RichText::new("Definir escala por distância conhecida").strong());ui.horizontal(|ui|{ui.add(egui::DragValue::new(&mut self.known_distance).speed(0.1).range(1e-9..=1e12));egui::ComboBox::from_id_salt("length_unit").selected_text(self.length_unit.symbol()).show_ui(ui,|ui|{ui.selectable_value(&mut self.length_unit,LengthUnit::Millimetre,"mm");ui.selectable_value(&mut self.length_unit,LengthUnit::Metre,"m");});});ui.label("Origem / método da referência");ui.text_edit_singleline(&mut self.scale_provenance);
+    if ui.button("Aplicar referência de escala").clicked(){let result=self.scene.calibrate(a,b,self.known_distance,self.length_unit,self.scale_provenance.clone());if result.is_ok(){self.dirty=true;}self.notice(result,"Escala declarada. Geometria original preservada.");}
+   }
+   ui.separator();match self.scene.scale_factor(){Ok(Some((_,unit)))=>{ui.label(RichText::new(format!("Escala declarada em {}",unit.symbol())).color(ACCENT));},Ok(None)=>{ui.label("Escala física desconhecida; valores em unidades da cena.");},Err(e)=>{ui.colored_label(Color32::LIGHT_RED,e.to_string());}}
+   if self.scene.calibration.is_some()&&ui.button("Remover referência de escala").clicked(){self.scene.calibration=None;self.dirty=true;}
+   ui.label(RichText::new("Incerteza desconhecida. Escala declarada não garante exatidão metrológica.").size(10.).color(MUTED));
+   let mut remove=None;egui::ScrollArea::vertical().max_height(180.).show(ui,|ui|{for m in &self.scene.measurements{ui.horizontal(|ui|{let text=match self.scene.distance(&m.a,&m.b){Ok(d)=>format!("{}: {:.3} {}",m.name,d.value,d.unit.map(|u|u.symbol()).unwrap_or("u. cena")),Err(_)=>format!("{}: recalibrar",m.name)};ui.label(text);if ui.small_button("Remover").clicked(){remove=Some(m.id.clone());}});}});
+   if let Some(id)=remove{self.scene.measurements.retain(|m|m.id!=id);self.dirty=true;}
+   if ui.add_enabled(!self.scene.measurements.is_empty(),egui::Button::new("Exportar relatório de medições")).clicked(){self.choose(Purpose::ExportMeasurements);}
+   ui.label(RichText::new("Salvar revisão do workspace preserva medidas, âncoras e referência de escala.").size(10.).color(MUTED));
+  });
+        self.show_measurements = open;
+        if !open {
+            self.measure_mode = false;
+        }
+    }
 }

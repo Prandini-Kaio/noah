@@ -35,3 +35,8 @@ Pedido do usuário autoriza E3 integrada e recorte E5 de montagem/explosão manu
 Operações principais estão na interface; E4 não foi iniciada. Não se declara
 E5 completa: CAD/restrições, alinhamento guiado e instâncias repetidas continuam
 fora desta prévia. Relatório: ../quality/INTERFACE-MONTAGENS-REPORT.md.
+
+## Continuação — E4 inicial
+Distâncias entre vértices, referência de escala explícita e anotações persistidas
+implementadas na interface. E4 completa (outras primitivas/anotações) permanece
+pendente; E5 ainda manual. Relatório: ../quality/E4-REPORT.md.

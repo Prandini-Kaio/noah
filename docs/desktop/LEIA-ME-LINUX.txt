@@ -1,4 +1,4 @@
-NOAH 2.0 — Prévia da interface e montagens
+NOAH 2.0 — Prévia com medições e escala
 
 COMO ABRIR
 Extraia toda a pasta e abra o arquivo executável NOAH com duplo clique.
@@ -54,3 +54,12 @@ Código original MIT. Demo sintética CC0-1.0. Dependências mantêm suas licen�
 incluídas na pasta third-party-licenses. COLMAP é um motor externo separado.
 
 Código e relatórios: https://github.com/Prandini-Kaio/noah
+
+MEDIÇÕES E ESCALA
+Clique Medir e Escolher pontos A e B; selecione vértices na geometria.
+Registre a distância com nome. Para escala física, declare distância conhecida,
+unidade mm/m e origem da referência. Aplicar referência não altera os pontos.
+Se transformações mudarem seu comprimento, recalibre ou remova a referência.
+Explosão não muda o valor medido; ele é calculado no estado montado.
+Salvar revisão preserva medidas e calibração. Exportar relatório gera JSON novo.
+Incerteza é desconhecida; escala declarada não garante precisão industrial.

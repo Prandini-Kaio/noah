@@ -11,6 +11,7 @@ use std::{
 pub mod assembly;
 pub mod camera;
 pub mod demo;
+pub mod measurement;
 pub use assembly::Assembly;
 pub mod session;
 pub use camera::Camera;
@@ -112,6 +113,8 @@ pub struct Scene {
     pub assemblies: Vec<Assembly>,
     pub explosion: f64,
     pub explosion_distance: f64,
+    pub calibration: Option<measurement::ScaleReference>,
+    pub measurements: Vec<measurement::Measurement>,
 }
 impl Default for Scene {
     fn default() -> Self {
@@ -126,6 +129,8 @@ impl Default for Scene {
             assemblies: vec![],
             explosion: 0.,
             explosion_distance: 1.,
+            calibration: None,
+            measurements: vec![],
         }
     }
 }

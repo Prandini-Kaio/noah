@@ -11,6 +11,7 @@ pub enum Purpose {
     Engine,
     Output,
     Export,
+    ExportMeasurements,
 }
 impl Purpose {
     fn title(self) -> &'static str {
@@ -24,13 +25,17 @@ impl Purpose {
             Self::Engine => "Escolher executável COLMAP",
             Self::Output => "Escolher pasta de resultados",
             Self::Export => "Exportar peça montada",
+            Self::ExportMeasurements => "Exportar relatório de medições",
         }
     }
     fn folder(self) -> bool {
         matches!(self, Self::Project | Self::Images | Self::Output)
     }
     fn creates(self) -> bool {
-        matches!(self, Self::SaveSession | Self::Demo | Self::Export)
+        matches!(
+            self,
+            Self::SaveSession | Self::Demo | Self::Export | Self::ExportMeasurements
+        )
     }
 }
 pub struct Browser {
@@ -57,6 +62,7 @@ impl Browser {
                 Purpose::SaveSession => "workspace-001.noah.json",
                 Purpose::Demo => "montagem-noah",
                 Purpose::Export => "peca.obj",
+                Purpose::ExportMeasurements => "medicoes.json",
                 _ => "",
             }
             .into(),

@@ -1,0 +1,45 @@
+{
+  "calibration": {
+    "a": {
+      "item_id": "file:a91ca21ef167ed4e407ce0214c2377fd9c2710dcda6ab37bace21e3372c78893",
+      "vertex": 1
+    },
+    "b": {
+      "item_id": "file:a91ca21ef167ed4e407ce0214c2377fd9c2710dcda6ab37bace21e3372c78893",
+      "vertex": 2
+    },
+    "known_distance": 100.0,
+    "provenance": "Referência informada pelo usuário",
+    "scene_distance": 1.0,
+    "unit": "millimetre"
+  },
+  "measurements": [
+    {
+      "a": {
+        "item_id": "file:a91ca21ef167ed4e407ce0214c2377fd9c2710dcda6ab37bace21e3372c78893",
+        "vertex": 1
+      },
+      "b": {
+        "item_id": "file:a91ca21ef167ed4e407ce0214c2377fd9c2710dcda6ab37bace21e3372c78893",
+        "vertex": 2
+      },
+      "id": "measurement:08f83d5678a84fb0b386b7645842c8b7",
+      "method": "Distância euclidiana entre vértices, estado montado",
+      "name": "Distância 1",
+      "scene_distance": 1.0,
+      "uncertainty": null,
+      "unit": "mm",
+      "value": 100.0
+    }
+  ],
+  "metrology_validated": false,
+  "schema_version": 1,
+  "sources": [
+    {
+      "kind": "ply",
+      "path": "/workspace/work/github-publication/NOAH-2.0/tests/datasets/reference-rgb.ply",
+      "sha256": "a91ca21ef167ed4e407ce0214c2377fd9c2710dcda6ab37bace21e3372c78893"
+    }
+  ],
+  "state": "assembled"
+}

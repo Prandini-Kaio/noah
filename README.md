@@ -10,9 +10,10 @@ fotogrametria e explorar resultados em um workspace desktop.
 | E1 — Fundação | PLY ASCII XYZ/RGB, transformações, projetos persistidos e CLI validados |
 | E2 — Fotogrametria | COLMAP 3.11.x esparso validado com 12 imagens sintéticas; densificação real pendente de CUDA |
 | E3 — Workspace desktop | Fluxos principais pela interface, reconstrução acompanhada e sessões verificadas |
+| E4 — Medições iniciais | Distâncias entre vértices, escala declarada, anotações e relatórios; sem validação metrológica |
 | Recorte E5 — Montagens | Hierarquia manual, exemplo de dez peças e vista explodida reversível |
 
-Snapshot de desenvolvimento: 30 testes passaram em Linux x86_64. O resultado
+Snapshot de desenvolvimento: 35 testes passaram em Linux x86_64. O resultado
 esparso incluído contém 7.592 pontos. Não são prometidas precisão metrológica,
 compatibilidade universal de formatos ou execução gráfica em todos os sistemas.
 
@@ -37,6 +38,7 @@ usar esse binário. Requer Linux x86_64, glibc 2.39+ e X11/XWayland com OpenGL.
 - **Criar montagem** e o inspetor permitem organizar e transformar componentes.
 - **Importar peças / Projeto-run** e **Abrir workspace** usam explorador integrado.
 - **Salvar revisão** preserva câmera, hierarquia, ajustes e explosão em arquivo novo.
+- **Medir** seleciona vértices A/B, registra distâncias e define uma referência de escala em mm/m. Medidas e referência acompanham a sessão.
 - **Reconstruir fotos** escolhe fotos, COLMAP e destino; acompanha etapas/logs,
   cancela o processamento e abre o resultado no workspace.
 
@@ -90,7 +92,8 @@ com hardware real nesta entrega. Não há download de dados nem telemetria do NO
 - [Pacote e instruções](LEIA-ME-PACOTE.md)
 - [Relatório E1](docs/quality/E1-REPORT.md)
 - [Relatório E2](docs/quality/E2-REPORT.md)
-- [Interface integrada e montagem — relatório atual](docs/quality/INTERFACE-MONTAGENS-REPORT.md)
+- [Medições e escala — relatório atual](docs/quality/E4-REPORT.md)
+- [Interface integrada e montagem — relatório](docs/quality/INTERFACE-MONTAGENS-REPORT.md)
 - [Relatório E3 histórico](docs/quality/E3-REPORT.md)
 - [Roadmap](docs/roadmap/ROADMAP.md)
 - [Arquitetura](docs/architecture/BOUNDARIES.md)
