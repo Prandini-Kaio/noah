@@ -1,6 +1,6 @@
 # NOAH — Arctic
 
-Arctic Dark é o padrão. Em **Visual**, alterne para Arctic Light e ajuste réguas,
+Arctic Dark é o padrão. Em **Preferências → Tema e opções visuais**, alterne para Arctic Light e ajuste réguas,
 eixos, anotações, grade, arame, projeção e movimento reduzido. Salvar revisão do
 workspace preserva as preferências; um workspace novo começa no padrão escuro.
 

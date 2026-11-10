@@ -1,14 +1,14 @@
 # Instruções para agentes — NOAH 2.0
 
 ## Missão e limites
-Desenvolva uma plataforma Rust local-first para reconstrução e manipulação 3D; no ciclo atual implemente **Arctic visual, animação e precisão de seleção sobre E3/E4/E5**, autorizado pelo usuário em 2026-11-10; E2 dense continua pendente. A fotogrametria será o primeiro motor de captura em E2; LiDAR e CAD são expansões futuras, não dependências atuais.
+Desenvolva uma plataforma Rust local-first para reconstrução e manipulação 3D; no ciclo atual implemente **estilhaços visuais temporários e organização da interface sobre Arctic/E3/E4/E5**, autorizado pelo usuário em 2026-11-10; E2 dense continua pendente. A fotogrametria será o primeiro motor de captura em E2; LiDAR e CAD são expansões futuras, não dependências atuais.
 
 ## Leitura obrigatória (nesta ordem)
 1. `README.md` (visão e roadmap geral)
 2. `docs/context/INDEX.md` (roteamento de contextos)
 3. `docs/context/DOMAIN.md` (invariantes)
 4. `docs/architecture/BOUNDARIES.md` (contratos)
-5. `docs/roadmap/ARCTIC-VISUAL.md` (escopo autorizado atual; E1/E2 são a base)
+5. `docs/roadmap/ESTILHACOS-LAYOUT.md` (escopo autorizado atual; E1/E2 são a base)
 6. `docs/quality/QUALITY.md` (critério de aceite)
 
 ## Regras operacionais
