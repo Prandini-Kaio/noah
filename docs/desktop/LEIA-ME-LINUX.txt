@@ -63,3 +63,18 @@ Se transformações mudarem seu comprimento, recalibre ou remova a referência.
 Explosão não muda o valor medido; ele é calculado no estado montado.
 Salvar revisão preserva medidas e calibração. Exportar relatório gera JSON novo.
 Incerteza é desconhecida; escala declarada não garante precisão industrial.
+
+ARCTIC — VISUAL E ANIMAÇÃO
+Dark é o padrão; escolha Arctic Light em Visual. Montada/Explodida animam a
+separação e remontagem de componentes, sem quebrar a malha. Reduzir movimentos
+aplica o destino imediatamente. Navegar interrompe a animação no estado atual.
+Visual reúne réguas, eixos, anotações, grade, arame e vistas de câmera.
+Ortográfica tem escala uniforme; em perspectiva a régua vale no plano do alvo.
+Sem calibração válida, réguas usam unidades da cena. Elas medem U/V projetados,
+não o comprimento 3D de uma aresta inclinada.
+Medir recolhe a janela durante seleção; retorna após A/B. Snap tem prévia, raio
+configurável, filtro e proteção frontal para até 200 mil faces visíveis.
+Seleção exata/coordenadas aceita índices de vértices originais (começam em 1).
+Até nove casas decimais controlam exibição, não exatidão física.
+Salvar revisão preserva tema/projeção/preferências em sessão 4 (lê sessões 1–3).
+Mantenha revisões antigas se precisar abrir o workspace em versões anteriores.

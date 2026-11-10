@@ -263,3 +263,152 @@ pub fn export_report(scene: &Scene, path: &std::path::Path) -> Result<()> {
     let report = serde_json::json!({"schema_version":1,"state":"assembled","metrology_validated":false,"calibration":scene.calibration,"sources":scene.sources,"measurements":entries});
     noah_pipeline::write_new(path, &serde_json::to_vec_pretty(&report)?)
 }
+
+/// Seleção controlada: até oito candidatos de tela, teste frontal em malhas.
+/// Acima de 200 mil faces visíveis, isolar peças ou desabilitar o teste frontal.
+pub fn pick_anchor_controlled(scene: &Scene, point: [f64; 2], size: [f64; 2]) -> Option<Anchor> {
+    use crate::{
+        Geometry,
+        camera::{self, Projection},
+    };
+    let options = &scene.view;
+    if options.selected_only && scene.selected.is_none() {
+        return None;
+    }
+    let transforms = scene.world_transforms(true).ok()?;
+    let faces: usize = scene
+        .items
+        .iter()
+        .filter(|i| i.visible)
+        .map(|i| match i.geometry.as_ref() {
+            Geometry::Mesh(m) => m.triangles().len(),
+            _ => 0,
+        })
+        .sum();
+    if options.occlusion && faces > 200_000 {
+        return None;
+    }
+    let mut candidates: Vec<(f64, f64, Anchor, [f64; 3])> = Vec::new();
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    for (index, item) in scene.items.iter().enumerate() {
+        if !item.visible {
+            continue;
+        }
+        let eligible = !options.selected_only
+            || scene.selected.as_ref() == Some(&item.id)
+            || scene
+                .selected
+                .as_ref()
+                .is_some_and(|id| scene.belongs_to(index, id));
+        for (vertex, &p) in item.geometry.positions().iter().enumerate() {
+            let p = transforms[index].apply(p).ok()?;
+            for a in 0..3 {
+                lo[a] = lo[a].min(p[a]);
+                hi[a] = hi[a].max(p[a]);
+            }
+            if !eligible {
+                continue;
+            }
+            if let Some(q) = scene.camera.project(p, size) {
+                if q[0] < 0. || q[0] > size[0] || q[1] < 0. || q[1] > size[1] {
+                    continue;
+                }
+                let d = (q[0] - point[0]).powi(2) + (q[1] - point[1]).powi(2);
+                if d <= options.snap_radius.powi(2) {
+                    candidates.push((
+                        d,
+                        q[2],
+                        Anchor {
+                            item_id: item.id.clone(),
+                            vertex,
+                        },
+                        p,
+                    ));
+                    candidates.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+                    candidates.truncate(8);
+                }
+            }
+        }
+    }
+    let diagonal = camera::sub(hi, lo)
+        .iter()
+        .map(|v| v * v)
+        .sum::<f64>()
+        .sqrt();
+    let reach = diagonal * 2. + scene.camera.distance + 1.;
+    for (_, _, anchor, point) in candidates {
+        if !options.occlusion || faces == 0 {
+            return Some(anchor);
+        }
+        let (eye, _, _, forward) = scene.camera.basis();
+        let origin = if scene.camera.projection == Projection::Orthographic {
+            camera::sub(point, camera::mul(forward, reach))
+        } else {
+            eye
+        };
+        let delta = camera::sub(point, origin);
+        let distance = camera::dot(delta, delta).sqrt();
+        if distance <= 0. {
+            continue;
+        }
+        let direction = camera::mul(delta, 1. / distance);
+        let tolerance = (distance * 1e-10).max(1e-10);
+        let mut occluded = false;
+        'objects: for (index, item) in scene.items.iter().enumerate() {
+            if !item.visible {
+                continue;
+            }
+            if let Geometry::Mesh(mesh) = item.geometry.as_ref() {
+                for triangle in mesh.triangles() {
+                    let tri =
+                        triangle.map(|i| transforms[index].apply(mesh.positions()[i as usize]));
+                    let [Ok(a), Ok(b), Ok(c)] = tri else {
+                        continue;
+                    };
+                    if let Some(t) = ray_triangle(origin, direction, [a, b, c])
+                        && t < distance - tolerance
+                    {
+                        occluded = true;
+                        break 'objects;
+                    }
+                }
+            }
+        }
+        if !occluded {
+            return Some(anchor);
+        }
+    }
+    None
+}
+fn ray_triangle(origin: [f64; 3], direction: [f64; 3], tri: [[f64; 3]; 3]) -> Option<f64> {
+    use crate::camera::{dot, sub};
+    let cross = |a: [f64; 3], b: [f64; 3]| {
+        [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ]
+    };
+    let a = sub(tri[1], tri[0]);
+    let b = sub(tri[2], tri[0]);
+    let p = cross(direction, b);
+    let determinant = dot(a, p);
+    let epsilon = 1e-12 * (dot(a, a) * dot(b, b)).sqrt().max(1e-24);
+    if determinant.abs() <= epsilon {
+        return None;
+    }
+    let inverse = 1. / determinant;
+    let s = sub(origin, tri[0]);
+    let u = dot(s, p) * inverse;
+    if !(-1e-10..=1. + 1e-10).contains(&u) {
+        return None;
+    }
+    let q = cross(s, a);
+    let v = dot(direction, q) * inverse;
+    if v < -1e-10 || u + v > 1. + 1e-10 {
+        return None;
+    }
+    let t = dot(b, q) * inverse;
+    (t > 1e-12 && t.is_finite()).then_some(t)
+}

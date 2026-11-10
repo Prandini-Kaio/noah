@@ -13,7 +13,7 @@ fotogrametria e explorar resultados em um workspace desktop.
 | E4 — Medições iniciais | Distâncias entre vértices, escala declarada, anotações e relatórios; sem validação metrológica |
 | Recorte E5 — Montagens | Hierarquia manual, exemplo de dez peças e vista explodida reversível |
 
-Snapshot de desenvolvimento: 35 testes passaram em Linux x86_64. O resultado
+Snapshot de desenvolvimento: 41 testes passaram em Linux x86_64. O resultado
 esparso incluído contém 7.592 pontos. Não são prometidas precisão metrológica,
 compatibilidade universal de formatos ou execução gráfica em todos os sistemas.
 
@@ -25,6 +25,19 @@ cd noah
 ```
 
 Também é possível baixar em **Code → Download ZIP**.
+
+## Arctic: interface e visualização
+
+Arctic Dark é o padrão; Arctic Light está em **Visual**. Explosão e remontagem
+agora têm transição animada, com opção de movimento reduzido. **Visual** também
+reúne projeção ortográfica, vistas frontal/superior/lateral, réguas calibradas,
+eixos e controles de seleção. **Medir** oferece snap frontal e entrada por
+índice original, coordenadas/deltas e casas decimais de exibição.
+
+[Guia Arctic e limites](docs/desktop/ARCTIC.md). Réguas em perspectiva valem no
+plano do alvo; em ortográfica a escala é uniforme. Não garantem exatidão física.
+
+![Arctic Dark](docs/desktop/arctic-dark.png)
 
 ## Usar a interface no Linux
 
@@ -92,7 +105,8 @@ com hardware real nesta entrega. Não há download de dados nem telemetria do NO
 - [Pacote e instruções](LEIA-ME-PACOTE.md)
 - [Relatório E1](docs/quality/E1-REPORT.md)
 - [Relatório E2](docs/quality/E2-REPORT.md)
-- [Medições e escala — relatório atual](docs/quality/E4-REPORT.md)
+- [Arctic — relatório atual](docs/quality/ARCTIC-REPORT.md)
+- [Medições e escala — relatório](docs/quality/E4-REPORT.md)
 - [Interface integrada e montagem — relatório](docs/quality/INTERFACE-MONTAGENS-REPORT.md)
 - [Relatório E3 histórico](docs/quality/E3-REPORT.md)
 - [Roadmap](docs/roadmap/ROADMAP.md)

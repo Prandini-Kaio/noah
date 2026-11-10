@@ -12,6 +12,7 @@ pub mod assembly;
 pub mod camera;
 pub mod demo;
 pub mod measurement;
+pub mod view;
 pub use assembly::Assembly;
 pub mod session;
 pub use camera::Camera;
@@ -115,6 +116,7 @@ pub struct Scene {
     pub explosion_distance: f64,
     pub calibration: Option<measurement::ScaleReference>,
     pub measurements: Vec<measurement::Measurement>,
+    pub view: view::ViewOptions,
 }
 impl Default for Scene {
     fn default() -> Self {
@@ -131,6 +133,7 @@ impl Default for Scene {
             explosion_distance: 1.,
             calibration: None,
             measurements: vec![],
+            view: Default::default(),
         }
     }
 }

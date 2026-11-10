@@ -6,11 +6,13 @@ use std::{
     sync::mpsc::{self, Receiver},
     time::Duration,
 };
+mod animation;
 mod browser;
 mod jobs;
+mod theme;
+mod viewport_tools;
 use browser::{Browser, Purpose};
-const ACCENT: Color32 = Color32::from_rgb(92, 220, 196);
-const MUTED: Color32 = Color32::from_rgb(143, 156, 176);
+use noah_workspace::{camera::Projection, view::ThemeMode};
 #[derive(Clone)]
 enum Replace {
     New,
@@ -42,20 +44,17 @@ struct Desktop {
     known_distance: f64,
     length_unit: LengthUnit,
     scale_provenance: String,
+    transition: Option<animation::ExplosionTransition>,
+    show_visual: bool,
+    hover_anchor: Option<Anchor>,
+    hover_pixel: Option<[f64; 2]>,
+    hover_updated: std::time::Instant,
+    exact_a: usize,
+    exact_b: usize,
 }
 impl Desktop {
     fn new(cc: &eframe::CreationContext<'_>, scene: Scene) -> Self {
-        let mut style = (*cc.egui_ctx.style()).clone();
-        style.visuals = egui::Visuals::dark();
-        style.visuals.panel_fill = Color32::from_rgb(20, 26, 36);
-        style.visuals.window_fill = Color32::from_rgb(25, 33, 45);
-        style.visuals.selection.bg_fill = Color32::from_rgb(32, 78, 82);
-        style.visuals.selection.stroke = Stroke::new(1.0_f32, ACCENT);
-        style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(31, 41, 55);
-        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(43, 61, 76);
-        style.spacing.item_spacing = Vec2::new(10., 10.);
-        style.spacing.button_padding = Vec2::new(12., 7.);
-        cc.egui_ctx.set_style(style);
+        theme::apply(&cc.egui_ctx, scene.view.theme);
         Self {
             scene,
             message: "Abra um workspace, importe peças ou explore a montagem de exemplo.".into(),
@@ -81,6 +80,13 @@ impl Desktop {
             known_distance: 100.,
             length_unit: LengthUnit::Millimetre,
             scale_provenance: "Referência informada pelo usuário".into(),
+            transition: None,
+            show_visual: false,
+            hover_anchor: None,
+            hover_pixel: None,
+            hover_updated: std::time::Instant::now(),
+            exact_a: 1,
+            exact_b: 2,
         }
     }
     fn notice(&mut self, result: noah_workspace::Result<()>, success: &str) {
@@ -124,6 +130,7 @@ impl Desktop {
             self.scene = Scene::default();
             self.anchors.clear();
             self.measure_mode = false;
+            self.transition = None;
             self.dirty = false;
             self.message = "Novo workspace. Importe componentes para começar.".into();
             return;
@@ -189,54 +196,70 @@ impl Desktop {
         }
     }
     fn header(&mut self, ctx: &egui::Context) {
+        let palette = self.palette();
         egui::TopBottomPanel::top("header")
             .exact_height(70.)
+            .frame(
+                egui::Frame::new()
+                    .fill(palette.background)
+                    .inner_margin(egui::Margin::symmetric(8, 0)),
+            )
             .show(ctx, |ui| {
                 ui.add_space(12.);
                 ui.horizontal(|ui| {
                     ui.add_space(10.);
-                    ui.label(RichText::new("N").size(30.).color(ACCENT));
+                    ui.label(RichText::new("N").size(30.).color(palette.primary));
                     ui.vertical(|ui| {
                         ui.label(RichText::new("NOAH 2.0").size(20.).strong());
                         ui.label(
                             RichText::new("WORKSPACE / MONTAGENS")
                                 .size(10.)
-                                .color(MUTED),
+                                .color(palette.secondary),
                         );
                     });
                     ui.add_space(28.);
-                    ui.label(RichText::new("Da captura ao conjunto").size(17.));
+                    ui.label(
+                        RichText::new(
+                            self.transition
+                                .as_ref()
+                                .map(|t| {
+                                    format!(
+                                        "{} · {:.0}%",
+                                        if t.to > t.from {
+                                            "Separando peças"
+                                        } else {
+                                            "Remontando"
+                                        },
+                                        t.amount() * 100.
+                                    )
+                                })
+                                .unwrap_or_else(|| "Da captura ao conjunto".into()),
+                        )
+                        .size(17.),
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.add_space(10.);
-                        ui.label(RichText::new("LOCAL • SEM UPLOAD").size(10.).color(ACCENT));
-                        if ui.button("Enquadrar [F]").clicked() {
+                        ui.label(
+                            RichText::new("LOCAL • SEM UPLOAD")
+                                .size(10.)
+                                .color(palette.primary),
+                        );
+                        if theme::action(ui, "Enquadrar [F]", palette, false).clicked() {
                             let result = self.scene.fit(false);
                             self.notice(result, "Cena enquadrada.");
                             self.dirty = true;
                         }
-                        if ui.button("Medir").clicked() {
+                        if theme::action(ui, "Medir", palette, false).clicked() {
                             self.show_measurements = true;
                         }
-                        if ui.button("Montada").clicked() {
-                            self.scene.explosion = 0.;
-                            let _ = self.scene.fit(false);
-                            self.dirty = true;
+                        if theme::action(ui, "Montada", palette, false).clicked() {
+                            self.animate_explosion(0.);
                         }
-                        if ui.button("Explodida").clicked() {
-                            let old = self.scene.explosion;
-                            self.scene.explosion = 1.;
-                            let result = self
-                                .scene
-                                .validate_world()
-                                .and_then(|()| self.scene.fit(false));
-                            if result.is_err() {
-                                self.scene.explosion = old;
-                            }
-                            self.notice(
-                                result,
-                                "Vista explodida: geometria e montagem originais preservadas.",
-                            );
-                            self.dirty = true;
+                        if theme::action(ui, "Explodida", palette, false).clicked() {
+                            self.animate_explosion(1.);
+                        }
+                        if theme::action(ui, "Visual", palette, false).clicked() {
+                            self.show_visual = true;
                         }
                     });
                 });
@@ -293,6 +316,7 @@ impl Desktop {
         }
     }
     fn left(&mut self, ctx: &egui::Context) {
+        let palette = self.palette();
         egui::SidePanel::left("workflow")
             .exact_width(270.)
             .resizable(false)
@@ -301,7 +325,11 @@ impl Desktop {
                     ui.disable();
                 }
                 ui.add_space(12.);
-                ui.label(RichText::new("SEU WORKSPACE").size(10.).color(MUTED));
+                ui.label(
+                    RichText::new("SEU WORKSPACE")
+                        .size(10.)
+                        .color(palette.secondary),
+                );
                 ui.label(
                     RichText::new(format!(
                         "{} peças · {} montagens",
@@ -315,37 +343,37 @@ impl Desktop {
                     .num_columns(2)
                     .spacing([6., 7.])
                     .show(ui, |ui| {
-                        if ui.button("Novo workspace").clicked() {
+                        if theme::action(ui, "Novo workspace", palette, false).clicked() {
                             self.request_replace(Replace::New);
                         }
-                        if ui.button("Abrir workspace").clicked() {
+                        if theme::action(ui, "Abrir workspace", palette, false).clicked() {
                             self.choose(Purpose::OpenSession);
                         }
                         ui.end_row();
-                        if ui.button("Importar peças").clicked() {
+                        if theme::action(ui, "Importar peças", palette, true).clicked() {
                             self.choose(Purpose::Import);
                         }
                         if ui.button("Projeto / run").clicked() {
                             self.choose(Purpose::Project);
                         }
                         ui.end_row();
-                        if ui.button("Salvar revisão").clicked() {
+                        if theme::action(ui, "Salvar revisão", palette, false).clicked() {
                             self.choose(Purpose::SaveSession);
                         }
-                        if ui.button("Reconstruir fotos").clicked() {
+                        if theme::action(ui, "Reconstruir fotos", palette, false).clicked() {
                             self.show_reconstruction = true;
                         }
                         ui.end_row();
                     });
                 ui.add_space(8.);
-                if ui.button("Explorar montagem de exemplo").clicked() {
+                if theme::action(ui, "Explorar montagem de exemplo", palette, false).clicked() {
                     self.choose(Purpose::Demo);
                 }
                 ui.separator();
                 ui.label(
                     RichText::new("ESTRUTURA DO CONJUNTO")
                         .size(10.)
-                        .color(MUTED),
+                        .color(palette.secondary),
                 );
                 egui::ScrollArea::vertical()
                     .id_salt("scene_tree")
@@ -368,95 +396,111 @@ impl Desktop {
                         "Escolha a montagem pai no inspetor para organizar cada componente.",
                     )
                     .size(10.)
-                    .color(MUTED),
+                    .color(palette.secondary),
                 );
             });
     }
     fn inspector(&mut self, ctx: &egui::Context) {
+        let palette = self.palette();
         egui::SidePanel::right("inspector").exact_width(286.).resizable(false).show(ctx,|ui|{if self.pending.is_some(){ui.disable();}egui::ScrollArea::vertical().id_salt("inspector_scroll").show(ui,|ui|{
-   ui.add_space(12.);ui.label(RichText::new("SELEÇÃO E MONTAGEM").size(10.).color(MUTED));
+   ui.add_space(12.);ui.label(RichText::new("SELEÇÃO E MONTAGEM").size(10.).color(palette.secondary));
    if let Some(id)=self.scene.selected.clone(){
     let item=self.scene.items.iter().position(|i|i.id==id);let group=self.scene.assemblies.iter().position(|g|g.id==id);
-    let (mut placement,parent)=if let Some(index)=item{let i=&self.scene.items[index];ui.heading(&i.name);let count=match i.geometry.as_ref(){Geometry::Mesh(m)=>format!("{} triângulos",m.triangles().len()),Geometry::Points(p)=>format!("{} pontos",p.positions().len())};ui.label(RichText::new(count).color(ACCENT));ui.label(format!("Unidade: {}",i.unit));ui.label(RichText::new(&i.frame).size(10.).color(MUTED));(i.placement.clone(),i.parent.clone())}else if let Some(index)=group{let group=&mut self.scene.assemblies[index];ui.heading("Montagem");if ui.text_edit_singleline(&mut group.name).changed(){self.dirty=true;}let count=self.scene.items.iter().enumerate().filter(|(i,_)|self.scene.belongs_to(*i,&id)).count();ui.label(format!("{count} componentes descendentes"));(self.scene.assemblies[index].placement.clone(),self.scene.assemblies[index].parent.clone())}else{return;};
+    let (mut placement,parent)=if let Some(index)=item{let i=&self.scene.items[index];ui.heading(&i.name);let count=match i.geometry.as_ref(){Geometry::Mesh(m)=>format!("{} triângulos",m.triangles().len()),Geometry::Points(p)=>format!("{} pontos",p.positions().len())};ui.label(RichText::new(count).color(palette.primary));ui.label(format!("Unidade: {}",i.unit));ui.label(RichText::new(&i.frame).size(10.).color(palette.secondary));(i.placement.clone(),i.parent.clone())}else if let Some(index)=group{let group=&mut self.scene.assemblies[index];ui.heading("Montagem");if ui.text_edit_singleline(&mut group.name).changed(){self.dirty=true;}let count=self.scene.items.iter().enumerate().filter(|(i,_)|self.scene.belongs_to(*i,&id)).count();ui.label(format!("{count} componentes descendentes"));(self.scene.assemblies[index].placement.clone(),self.scene.assemblies[index].parent.clone())}else{return;};
     ui.separator();let groups:Vec<_>=self.scene.assemblies.iter().filter(|g|g.id!=id).map(|g|(g.id.clone(),g.name.clone())).collect();let mut chosen=parent.clone();
     egui::ComboBox::from_id_salt("parent").selected_text(parent.as_ref().and_then(|id|groups.iter().find(|(g,_)|g==id).map(|(_,name)|name.as_str())).unwrap_or("Raiz do workspace")).width(240.).show_ui(ui,|ui|{ui.selectable_value(&mut chosen,None,"Raiz do workspace");for (id,name) in &groups{ui.selectable_value(&mut chosen,Some(id.clone()),name);}});
     if chosen!=parent{let result=self.scene.set_parent(&id,chosen);if result.is_ok(){self.dirty=true;}self.notice(result,"Montagem pai atualizada; valores locais preservados.");}
-    ui.label(RichText::new("A transformação abaixo é local à montagem pai.").size(10.).color(MUTED));ui.add_space(8.);
+    ui.label(RichText::new("A transformação abaixo é local à montagem pai.").size(10.).color(palette.secondary));ui.add_space(8.);
     let mut changed=false;ui.label("Translação X / Y / Z");ui.horizontal(|ui|{for value in &mut placement.translation{changed|=ui.add(egui::DragValue::new(value).speed(0.01).range(-1e9..=1e9).max_decimals(3)).changed();}});
     ui.label("Rotação X / Y / Z (graus)");ui.horizontal(|ui|{for angle in &mut placement.angles{let mut degrees=angle.to_degrees();if ui.add(egui::DragValue::new(&mut degrees).speed(0.5).range(-3600.0..=3600.0).max_decimals(1)).changed(){*angle=degrees.to_radians();changed=true;}}});
     ui.label("Escala uniforme");changed|=ui.add(egui::DragValue::new(&mut placement.scale).speed(0.01).range(1e-6..=1e6)).changed();
     if changed{let result=if let Some(index)=item{self.scene.set_placement(index,placement)}else{self.scene.set_group_placement(&id,placement)};if result.is_ok(){self.dirty=true;}self.notice(result,"Transformação aplicada à seleção.");}
     ui.horizontal(|ui|{if ui.button("Restaurar ajuste").clicked(){let result=if let Some(index)=item{self.scene.set_placement(index,Placement::default())}else{self.scene.set_group_placement(&id,Placement::default())};self.notice(result,"Ajuste local restaurado.");self.dirty=true;}
 if ui.button("Enquadrar").clicked(){let r=self.scene.fit(true);self.notice(r,"Seleção enquadrada.");self.dirty=true;}});
-    if let Some(index)=item{ui.add_space(5.);if ui.button("Exportar peça montada").clicked(){self.choose(Purpose::Export);}let source=&self.scene.sources[self.scene.items[index].source];ui.label(RichText::new(source.path.display().to_string()).size(9.).color(MUTED));}
+    if let Some(index)=item{ui.add_space(5.);if ui.button("Exportar peça montada").clicked(){self.choose(Purpose::Export);}let source=&self.scene.sources[self.scene.items[index].source];ui.label(RichText::new(source.path.display().to_string()).size(9.).color(palette.secondary));}
    }else{ui.heading("Explore seu conjunto");ui.label("Selecione uma peça ou montagem na cena ou na estrutura à esquerda.");}
-   ui.add_space(12.);ui.separator();ui.label(RichText::new("VISTA EXPLODIDA").color(ACCENT).strong());let old=(self.scene.explosion,self.scene.explosion_distance);
+   ui.add_space(12.);ui.separator();ui.label(RichText::new("VISTA EXPLODIDA").color(palette.primary).strong());let old=(self.scene.explosion,self.scene.explosion_distance);
    let mut changed=ui.add(egui::Slider::new(&mut self.scene.explosion,0.0..=1.0).text("Intensidade")).changed();ui.label("Afastamento em unidades da cena");changed|=ui.add(egui::DragValue::new(&mut self.scene.explosion_distance).speed(0.05).range(0.0..=1e6)).changed();
-   if changed{if let Err(e)=self.scene.validate_world(){self.scene.explosion=old.0;self.scene.explosion_distance=old.1;self.notice(Err(e),"");}else{self.dirty=true;}}
-   ui.label(RichText::new("A explosão é apenas visual. Montada restaura as posições do conjunto.").size(10.).color(MUTED));ui.add_space(10.);ui.separator();ui.label("VISUALIZAÇÃO");
+   if changed{self.transition=None;if let Err(e)=self.scene.validate_world(){self.scene.explosion=old.0;self.scene.explosion_distance=old.1;self.notice(Err(e),"");}else{self.dirty=true;}}
+   ui.label(RichText::new("A explosão é apenas visual. Montada restaura as posições do conjunto.").size(10.).color(palette.secondary));ui.add_space(10.);ui.separator();ui.label("VISUALIZAÇÃO");
    if ui.checkbox(&mut self.scene.grid,"Grade de navegação").changed(){self.dirty=true;}
 if ui.checkbox(&mut self.scene.wireframe,"Malha em arame").changed(){self.dirty=true;}
 if ui.add(egui::Slider::new(&mut self.scene.point_size,1.0..=8.0).text("Pontos / px")).changed(){self.dirty=true;}
-   ui.label(RichText::new("Até 50 mil pontos / 20 mil faces na tela. Oclusão aproximada nesta versão.").size(10.).color(MUTED));
+   ui.label(RichText::new("Até 50 mil pontos / 20 mil faces na tela. Oclusão aproximada nesta versão.").size(10.).color(palette.secondary));
   });});
     }
     fn viewport(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(Color32::from_rgb(12,18,27))).show(ctx,|ui|{
-            let (response,painter)=ui.allocate_painter(ui.available_size(),Sense::click_and_drag());let rect=response.rect;let size=[rect.width() as f64,rect.height() as f64];
-            if response.dragged() && self.pending.is_none(){let delta=ctx.input(|i|i.pointer.delta());let pan=response.dragged_by(egui::PointerButton::Secondary)||response.dragged_by(egui::PointerButton::Middle)||ctx.input(|i|i.modifiers.shift);if pan{self.scene.camera.pan([delta.x as f64,delta.y as f64],size[1]);}else{self.scene.camera.orbit([delta.x as f64,delta.y as f64]);}self.dirty=true;}
-            if response.hovered() && self.pending.is_none(){let scroll=ctx.input(|i|i.smooth_scroll_delta.y);if scroll!=0.{self.scene.camera.zoom(scroll as f64);self.dirty=true;}}
+        let palette = self.palette();
+        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(palette.viewport)).show(ctx,|ui|{
+            let (response,painter)=ui.allocate_painter(ui.available_size(),Sense::click_and_drag());let outer=response.rect;let rect=if self.scene.view.rulers{Rect::from_min_max(outer.min+Vec2::splat(viewport_tools::RULER),outer.max)}else{outer};let size=[rect.width() as f64,rect.height() as f64];
+            if response.dragged() && self.pending.is_none(){self.stop_transition();let delta=ctx.input(|i|i.pointer.delta());let pan=response.dragged_by(egui::PointerButton::Secondary)||response.dragged_by(egui::PointerButton::Middle)||ctx.input(|i|i.modifiers.shift);if pan{self.scene.camera.pan([delta.x as f64,delta.y as f64],size[1]);}else{self.scene.camera.orbit([delta.x as f64,delta.y as f64]);}self.dirty=true;}
+            if response.hovered() && self.pending.is_none(){let scroll=ctx.input(|i|i.smooth_scroll_delta.y);if scroll!=0.{self.stop_transition();self.scene.camera.zoom(scroll as f64);self.dirty=true;}}
             if !ctx.wants_keyboard_input()&&ctx.input(|i|i.key_pressed(egui::Key::F)){let result=self.scene.fit(false);self.notice(result,"Cena enquadrada.");self.dirty=true;}
+            let mut display_scene=self.scene.clone();
+            if let Some(t)=&self.transition{display_scene.explosion=t.value();display_scene.camera=t.camera();}
+            let display_painter=painter.with_clip_rect(rect);
             let to_screen=|p:[f64;2]|Pos2::new(rect.left()+p[0] as f32,rect.top()+p[1] as f32);
-            if self.scene.grid{
+            if self.scene.grid&&display_scene.camera.projection==Projection::Orthographic{viewport_tools::ortho_grid(&display_painter,&display_scene,rect,palette);}
+            if self.scene.grid&&display_scene.camera.projection==Projection::Perspective{
                 let center=self.scene.camera.target;let step=10f64.powf((self.scene.camera.distance/8.).log10().floor());let range=10;
                 for i in -range..=range{for axis in 0..2{let mut a=center;let mut b=center;a[2]=0.;b[2]=0.;a[axis]+=i as f64*step;b[axis]+=i as f64*step;a[1-axis]-=range as f64*step;b[1-axis]+=range as f64*step;
-                    if let (Some(a),Some(b))=(self.scene.camera.project(a,size),self.scene.camera.project(b,size)){painter.line_segment([to_screen([a[0],a[1]]),to_screen([b[0],b[1]])],Stroke::new(1.0_f32,Color32::from_rgb(28,39,53)));}
+                    if let (Some(a),Some(b))=(display_scene.camera.project(a,size),display_scene.camera.project(b,size)){display_painter.line_segment([to_screen([a[0],a[1]]),to_screen([b[0],b[1]])],Stroke::new(1.0_f32,palette.border.gamma_multiply(0.55)));}
                 }}
             }
-            let primitives=noah_workspace::project(&self.scene,size);self.shown=primitives.len();
-            if response.clicked() && self.pending.is_none()&& let Some(pos)=response.interact_pointer_pos(){
+            let primitives=noah_workspace::project(&display_scene,size);self.shown=primitives.len();
+            if response.clicked() && self.pending.is_none()&& let Some(pos)=response.interact_pointer_pos() && rect.contains(pos){
                 let point=[(pos.x-rect.left()) as f64,(pos.y-rect.top()) as f64];
-                if self.measure_mode{
-                    if let Some(anchor)=measurement::pick_anchor(&self.scene,point,size,12.){
+                if self.measure_mode && self.transition.is_some(){self.notice(Err("Aguarde o fim da animação para selecionar vértices".into()),"");}
+                else if self.measure_mode{
+                    if let Some(anchor)=measurement::pick_anchor_controlled(&display_scene,point,size){
                         if self.anchors.last()==Some(&anchor){self.notice(Err("Escolha outro vértice para o segundo ponto".into()),"");}
-                        else{self.anchors.push(anchor);if self.anchors.len()==2{self.measure_mode=false;self.notice(Ok(()),"Dois vértices selecionados. Abra Medir para registrar ou definir escala.");}else{self.notice(Ok(()),"Ponto A escolhido; selecione o ponto B.");}}
-                    }else{self.notice(Err("Nenhum vértice próximo. Aproxime a câmera e tente novamente.".into()),"");}
+                        else{self.anchors.push(anchor);if self.anchors.len()==2{self.measure_mode=false;self.show_measurements=true;self.notice(Ok(()),"Dois vértices selecionados. Abra Medir para registrar ou definir escala.");}else{self.notice(Ok(()),"Ponto A escolhido; selecione o ponto B.");}}
+                    }else{let faces:usize=self.scene.items.iter().filter(|i|i.visible).map(|i|match i.geometry.as_ref(){Geometry::Mesh(m)=>m.triangles().len(),_=>0}).sum();let text=if self.scene.view.occlusion&&faces>200_000{"Proteção frontal limitada a 200 mil faces visíveis. Isole peças ou desative essa opção em Visual."}else if self.scene.view.selected_only&&self.scene.selected.is_none(){"Selecione uma peça/montagem ou desative o filtro em Visual."}else{"Nenhum vértice próximo. Aproxime a câmera e tente novamente."};self.notice(Err(text.into()),"");}
                 }else{self.scene.selected=noah_workspace::pick(&primitives,point,7.).map(|i|self.scene.items[i].id.clone());self.dirty=true;}
             }
             let mut mesh=egui::Mesh::default();let mut edges=Vec::new();
             for primitive in &primitives{
                 if primitive.pixels.iter().flatten().any(|v|v.abs()>1e7){continue;}
                 let selected=Some(&self.scene.items[primitive.item].id)==self.scene.selected.as_ref()||self.scene.selected.as_ref().is_some_and(|id|self.scene.belongs_to(primitive.item,id));
-                let color=if selected{Color32::from_rgb(246,187,94)}else{Color32::from_rgb(primitive.color[0],primitive.color[1],primitive.color[2])};
+                let original=primitive.color;let color=if selected{Color32::from_rgb(((original[0] as u16+palette.primary.r() as u16)/2) as u8,((original[1] as u16+palette.primary.g() as u16)/2) as u8,((original[2] as u16+palette.primary.b() as u16)/2) as u8)}else{Color32::from_rgb(original[0],original[1],original[2])};
                 if primitive.pixels.len()==1{let pos=to_screen(primitive.pixels[0]);mesh.add_colored_rect(Rect::from_center_size(pos,Vec2::splat(self.scene.point_size)),color);}else{
                     let points:Vec<_>=primitive.pixels.iter().map(|&p|to_screen(p)).collect();
                     if !self.scene.wireframe{let start=mesh.vertices.len() as u32;for &p in &points{mesh.colored_vertex(p,color);}mesh.indices.extend([start,start+1,start+2]);}
-                    let line=if selected{Color32::from_rgb(162,103,45)}else{Color32::from_rgb(31,73,87)};
+                    let line=if selected{palette.primary}else{palette.border};
                     if self.scene.wireframe {for i in 0..3{edges.push(egui::Shape::line_segment([points[i],points[(i+1)%3]],Stroke::new(1.0_f32,line)));}}
                 }
             }
-            painter.add(egui::Shape::mesh(mesh));painter.extend(edges);
-            let visual_transforms=self.scene.world_transforms(true).ok();
-            let anchor_screen=|a:&Anchor|self.scene.items.iter().position(|i|i.id==a.item_id).filter(|&index|self.scene.items[index].visible).and_then(|index|self.scene.items[index].geometry.positions().get(a.vertex).and_then(|&p|visual_transforms.as_ref().and_then(|ts|ts[index].apply(p).ok()))).and_then(|p|self.scene.camera.project(p,size)).map(|p|to_screen([p[0],p[1]]));
-            for measure in &self.scene.measurements{
+            display_painter.add(egui::Shape::mesh(mesh));display_painter.extend(edges);
+            let visual_transforms=display_scene.world_transforms(true).ok();
+            let anchor_screen=|a:&Anchor|self.scene.items.iter().position(|i|i.id==a.item_id).filter(|&index|self.scene.items[index].visible).and_then(|index|self.scene.items[index].geometry.positions().get(a.vertex).and_then(|&p|visual_transforms.as_ref().and_then(|ts|ts[index].apply(p).ok()))).and_then(|p|display_scene.camera.project(p,size)).map(|p|to_screen([p[0],p[1]]));
+            for measure in self.scene.measurements.iter().filter(|_|self.scene.view.annotations){
                 if let (Some(a),Some(b))=(anchor_screen(&measure.a),anchor_screen(&measure.b)){
-                    painter.line_segment([a,b],Stroke::new(1.5_f32,ACCENT));painter.circle_filled(a,3.5,ACCENT);painter.circle_filled(b,3.5,ACCENT);
-                    let label=match self.scene.distance(&measure.a,&measure.b){Ok(d)=>format!("{}: {:.3} {} (montado)",measure.name,d.value,d.unit.map(|u|u.symbol()).unwrap_or("u. cena")),Err(_)=>format!("{}: recalibrar escala",measure.name)};
-                    painter.text(a+(b-a)*0.5,egui::Align2::CENTER_BOTTOM,label,FontId::proportional(11.),ACCENT);
+                    display_painter.line_segment([a,b],Stroke::new(1.5_f32,palette.primary));display_painter.circle_filled(a,3.5,palette.primary);display_painter.circle_filled(b,3.5,palette.primary);
+                    let label=match self.scene.distance(&measure.a,&measure.b){Ok(d)=>format!("{}: {:.*} {} (montado)",measure.name,self.scene.view.decimals,d.value,d.unit.map(|u|u.symbol()).unwrap_or("u. cena")),Err(_)=>format!("{}: recalibrar escala",measure.name)};
+                    display_painter.text(a+(b-a)*0.5,egui::Align2::CENTER_BOTTOM,label,FontId::proportional(11.),palette.primary);
                 }
             }
-            for (i,a) in self.anchors.iter().enumerate(){if let Some(p)=anchor_screen(a){painter.circle_filled(p,6.,Color32::from_rgb(250,187,94));painter.text(p+Vec2::new(10.,-10.),egui::Align2::LEFT_BOTTOM,if i==0{"A"}else{"B"},FontId::proportional(14.),Color32::WHITE);}}
-            if self.measure_mode{painter.text(rect.center_top()+Vec2::new(0.,25.),egui::Align2::CENTER_TOP,"MEDIÇÃO: clique nos vértices A e B",FontId::proportional(14.),ACCENT);}
-            let top=rect.left_top()+Vec2::new(22.,22.);painter.text(top,egui::Align2::LEFT_TOP,"PERSPECTIVA",FontId::proportional(11.),MUTED);
-            painter.text(top+Vec2::new(0.,20.),egui::Align2::LEFT_TOP,format!("{} primitivas na tela",self.shown),FontId::proportional(10.),Color32::from_rgb(93,112,133));
-            if self.scene.items.is_empty(){let center=rect.center();painter.text(center-Vec2::new(0.,25.),egui::Align2::CENTER_CENTER,"Seu espaço de geometria",FontId::proportional(27.),Color32::from_rgb(190,204,220));painter.text(center+Vec2::new(0.,20.),egui::Align2::CENTER_CENTER,"Abra uma nuvem, malha, projeto ou run para começar.",FontId::proportional(13.),MUTED);}
-            painter.text(rect.left_bottom()+Vec2::new(22.,-24.),egui::Align2::LEFT_BOTTOM,"Arrastar: órbita   •   Direito / Shift: pan   •   Roda: zoom   •   Clique: selecionar",FontId::proportional(10.),MUTED);
-            painter.text(rect.right_bottom()-Vec2::new(20.,24.),egui::Align2::RIGHT_BOTTOM,"XYZ do arquivo",FontId::proportional(10.),ACCENT);
+            for (i,a) in self.anchors.iter().enumerate(){if let Some(p)=anchor_screen(a){display_painter.circle_filled(p,6.,palette.warning);display_painter.text(p+Vec2::new(10.,-10.),egui::Align2::LEFT_BOTTOM,if i==0{"A"}else{"B"},FontId::proportional(14.),Color32::WHITE);}}
+            if self.measure_mode{display_painter.text(rect.center_top()+Vec2::new(0.,25.),egui::Align2::CENTER_TOP,"MEDIÇÃO: clique nos vértices A e B",FontId::proportional(14.),palette.primary);}
+            if self.measure_mode&&self.transition.is_none(){ctx.request_repaint_after(Duration::from_millis(75));
+                if let Some(pos)=response.hover_pos().filter(|pos|rect.contains(*pos)){
+                    let pixel=[(pos.x-rect.left()) as f64,(pos.y-rect.top()) as f64];
+                    if self.hover_pixel!=Some(pixel)&&self.hover_updated.elapsed()>Duration::from_millis(75){self.hover_anchor=measurement::pick_anchor_controlled(&display_scene,pixel,size);self.hover_pixel=Some(pixel);self.hover_updated=std::time::Instant::now();}
+                    if let Some(a)=&self.hover_anchor&&let Some(p)=anchor_screen(a){display_painter.circle_stroke(p,9.,Stroke::new(1.5_f32,palette.primary));display_painter.line_segment([p-Vec2::new(13.,0.),p+Vec2::new(13.,0.)],Stroke::new(1.0_f32,palette.primary));display_painter.text(p+Vec2::new(15.,-15.),egui::Align2::LEFT_BOTTOM,format!("Vértice {}",a.vertex+1),FontId::proportional(11.),palette.primary);}
+                }else{self.hover_anchor=None;self.hover_pixel=None;}
+            }
+            viewport_tools::draw(&painter,&display_scene,outer,rect,palette,response.hover_pos());
+            let top=rect.left_top()+Vec2::new(22.,22.);display_painter.text(top,egui::Align2::LEFT_TOP,if display_scene.camera.projection==Projection::Orthographic{"ORTOGRÁFICA · U/V"}else{"PERSPECTIVA"},FontId::proportional(11.),palette.secondary);
+            display_painter.text(top+Vec2::new(0.,20.),egui::Align2::LEFT_TOP,format!("{} primitivas na tela",self.shown),FontId::proportional(10.),palette.secondary);
+            if self.scene.items.is_empty(){let center=rect.center();display_painter.text(center-Vec2::new(0.,25.),egui::Align2::CENTER_CENTER,"Seu espaço de geometria",FontId::proportional(27.),palette.text);display_painter.text(center+Vec2::new(0.,20.),egui::Align2::CENTER_CENTER,"Abra uma nuvem, malha, projeto ou run para começar.",FontId::proportional(13.),palette.secondary);}
+            display_painter.text(rect.left_bottom()+Vec2::new(22.,-24.),egui::Align2::LEFT_BOTTOM,"Arrastar: órbita   •   Direito / Shift: pan   •   Roda: zoom   •   Clique: selecionar",FontId::proportional(10.),palette.secondary);
+            display_painter.text(rect.right_bottom()-Vec2::new(20.,24.),egui::Align2::RIGHT_BOTTOM,"XYZ do arquivo",FontId::proportional(10.),palette.primary);
         });
     }
 }
 impl Desktop {
     fn reconstruction_window(&mut self, ctx: &egui::Context) {
+        let palette = self.palette();
         let mut open = self.show_reconstruction;
         egui::Window::new("Fotogrametria local").open(&mut open).default_width(660.).collapsible(false).show(ctx,|ui|{
    ui.label(RichText::new("Fotografias / Câmeras / Nuvem de pontos").size(18.).strong());ui.label("Escolha um COLMAP 3.11.x instalado localmente. Seus dados permanecem nesta máquina.");ui.separator();
@@ -467,22 +511,44 @@ impl Desktop {
     ui.horizontal(|ui|{if ui.button("3. Pasta de resultados").clicked(){self.choose(Purpose::Output);}ui.label(self.reconstruction.parent.display().to_string());});
     ui.horizontal(|ui|{ui.label("Nome da reconstrução");ui.text_edit_singleline(&mut self.reconstruction.name);});
     ui.checkbox(&mut self.reconstruction.dense,"Incluir densificação (requer CUDA e GPU compatível)");ui.horizontal(|ui|{ui.label("Tempo máximo por etapa / segundos");ui.add(egui::DragValue::new(&mut self.reconstruction.timeout).range(1..=86400));});
-    if ui.button(RichText::new("Iniciar reconstrução").color(ACCENT)).clicked(){let result=self.reconstruction.start();self.notice(result,"Reconstrução iniciada. Você pode continuar explorando a cena.");}
+    if ui.button(RichText::new("Iniciar reconstrução").color(palette.primary)).clicked(){let result=self.reconstruction.start();self.notice(result,"Reconstrução iniciada. Você pode continuar explorando a cena.");}
    });
    ui.separator();if busy{ui.horizontal(|ui|{ui.spinner();ui.label("Processamento em andamento");if ui.button("Cancelar processamento").clicked(){let result=self.reconstruction.cancel();self.notice(result,"Cancelamento solicitado.");}});}
    ui.label(&self.reconstruction.status);
-   if let Some(manifest)=&self.reconstruction.manifest{ui.label(format!("Estado: {} · {} imagens",jobs::status_label(&manifest.status),manifest.inputs.len()));for step in &manifest.steps{ui.horizontal(|ui|{ui.label(jobs::status_label(&step.status));ui.label(jobs::step_label(&step.name));});}}
+   if let Some(manifest)=&self.reconstruction.manifest{ui.label(format!("Estado: {} · {} imagens",jobs::status_label(&manifest.status),manifest.inputs.len()));for step in &manifest.steps{ui.horizontal(|ui|{ui.colored_label(match step.status{noah_pipeline::Status::Succeeded=>palette.success,noah_pipeline::Status::Failed=>palette.error,noah_pipeline::Status::Cancelled=>palette.warning,_=>palette.secondary},jobs::status_label(&step.status));ui.label(jobs::step_label(&step.name));});}}
    ui.horizontal(|ui|{
     if ui.button("Ver logs e diagnóstico").clicked(){match self.reconstruction.logs(){Ok(text)=>{self.log_text=text;self.show_logs=true;},Err(e)=>self.notice(Err(e),"")}}
     let output=self.reconstruction.output.clone();let available=!busy&&output.as_ref().is_some_and(|p|p.join("exports/sparse.ply").is_file());
     if ui.add_enabled(available,egui::Button::new("Abrir nuvem no workspace")).clicked()&&let Some(root)=output{self.load_source(root);}
-   });ui.label(RichText::new("Falhas e resultados parciais são preservados. As fotos não são alteradas.").size(11.).color(MUTED));
+   });ui.label(RichText::new("Falhas e resultados parciais são preservados. As fotos não são alteradas.").size(11.).color(palette.secondary));
   });
         self.show_reconstruction = open;
     }
 }
 impl eframe::App for Desktop {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        let palette = self.palette();
+        theme::apply(ctx, self.scene.view.theme);
+        if self.scene.view.reduced_motion && self.transition.is_some() {
+            self.transition = None;
+            self.notice(Ok(()), "Vista aplicada sem animação (movimento reduzido).");
+        }
+        if let Some(t) = &mut self.transition {
+            if t.tick(ctx.input(|i| i.stable_dt) as f64) {
+                ctx.request_repaint_after(Duration::from_millis(16));
+            } else {
+                let exploded = t.to > 0.;
+                self.transition = None;
+                self.notice(
+                    Ok(()),
+                    if exploded {
+                        "Vista explodida aplicada; geometria original preservada."
+                    } else {
+                        "Conjunto remontado."
+                    },
+                );
+            }
+        }
         self.reconstruction.refresh();
         if self.reconstruction.worker.is_some() {
             ctx.request_repaint_after(Duration::from_millis(100));
@@ -494,6 +560,9 @@ impl eframe::App for Desktop {
                     match result {
                         Ok(scene) => {
                             self.scene = scene;
+                            ctx.request_repaint();
+                            self.transition = None;
+                            self.hover_anchor = None;
                             self.anchors.clear();
                             self.measure_mode = false;
                             self.dirty = !self.pending_session;
@@ -524,9 +593,9 @@ impl eframe::App for Desktop {
                         ui.spinner();
                     }
                     ui.label(RichText::new(&self.message).size(11.).color(if self.error {
-                        Color32::LIGHT_RED
+                        palette.error
                     } else {
-                        MUTED
+                        palette.secondary
                     }))
                     .on_hover_text(&self.message);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -538,7 +607,7 @@ impl eframe::App for Desktop {
                                 "WORKSPACE LOCAL"
                             })
                             .size(10.)
-                            .color(ACCENT),
+                            .color(palette.primary),
                         );
                     });
                 });
@@ -546,8 +615,14 @@ impl eframe::App for Desktop {
         self.left(ctx);
         self.inspector(ctx);
         self.viewport(ctx);
+        if self.transition.is_some() {
+            ctx.request_repaint_after(Duration::from_millis(16));
+        }
         if self.show_measurements {
             self.measurement_window(ctx);
+        }
+        if self.show_visual {
+            self.visual_window(ctx);
         }
         if self.show_reconstruction {
             self.reconstruction_window(ctx);
@@ -672,30 +747,154 @@ fn main() -> eframe::Result {
 
 impl Desktop {
     fn measurement_window(&mut self, ctx: &egui::Context) {
+        let palette = self.palette();
         let mut open = self.show_measurements;
+        let mut requested_pick = false;
         egui::Window::new("Medições e referência de escala").open(&mut open).default_width(440.).default_pos([300.,90.]).show(ctx,|ui|{
-   ui.label("Distância entre vértices no estado montado.");ui.label(RichText::new("A vista explodida não altera o valor medido.").size(11.).color(MUTED));
-   ui.horizontal(|ui|{if ui.button("Escolher pontos A e B").clicked(){self.anchors.clear();self.measure_mode=true;self.notice(Ok(()),"Clique nos vértices da geometria: primeiro A, depois B.");}
+   egui::ScrollArea::vertical().id_salt("measurement_scroll").max_height((ctx.content_rect().height()-170.).max(240.)).show(ui,|ui|{
+   ui.label("Distância entre vértices no estado montado.");ui.label(RichText::new("A vista explodida não altera o valor medido.").size(11.).color(palette.secondary));
+   ui.horizontal(|ui|{if ui.button("Escolher pontos A e B").clicked(){self.anchors.clear();self.measure_mode=true;self.hover_anchor=None;requested_pick=true;self.notice(Ok(()),"Clique nos vértices da geometria: primeiro A, depois B.");}
 if ui.button("Cancelar seleção").clicked(){self.measure_mode=false;self.anchors.clear();}});
+   egui::CollapsingHeader::new("Seleção exata / coordenadas").show(ui,|ui|{
+    ui.label("Selecione uma peça na árvore e informe os índices dos vértices (começam em 1).");
+    ui.horizontal(|ui|{ui.label("A");ui.add(egui::DragValue::new(&mut self.exact_a).range(1..=1_000_000));ui.label("B");ui.add(egui::DragValue::new(&mut self.exact_b).range(1..=1_000_000));});
+    if ui.button("Usar estes vértices").clicked(){
+     if let Some(item)=self.scene.items.iter().find(|i|Some(&i.id)==self.scene.selected.as_ref()){
+      let a=Anchor{item_id:item.id.clone(),vertex:self.exact_a.saturating_sub(1)};let b=Anchor{item_id:item.id.clone(),vertex:self.exact_b.saturating_sub(1)};
+      match self.scene.raw_distance(&a,&b){Ok(_) if a!=b=>{self.anchors=vec![a,b];self.measure_mode=false;self.notice(Ok(()),"Vértices selecionados por índice original.");},_=>self.notice(Err("Índices ausentes ou iguais".into()),"")}
+     }else{self.notice(Err("Selecione uma peça, não uma montagem, na árvore.".into()),"");}
+    }
+    ui.label(RichText::new("Para melhorar o controle, use vistas ortográficas e o filtro de seleção em Visual.").size(10.).color(palette.secondary));
+   });
    for (i,anchor) in self.anchors.iter().enumerate(){let name=self.scene.items.iter().find(|item|item.id==anchor.item_id).map(|i|i.name.as_str()).unwrap_or("Fonte ausente");ui.label(format!("{}: {} / vértice {}",if i==0{"A"}else{"B"},name,anchor.vertex+1));}
+   for (label,anchor) in ["A","B"].into_iter().zip(&self.anchors){if let Ok(p)=self.scene.anchor_position(anchor,false){ui.label(RichText::new(format!("{label} montado: [{:.*}, {:.*}, {:.*}] u. cena",self.scene.view.decimals,p[0],self.scene.view.decimals,p[1],self.scene.view.decimals,p[2])).size(10.).color(palette.secondary));}}
    if self.anchors.len()==2{
     let a=self.anchors[0].clone();let b=self.anchors[1].clone();
-    match self.scene.distance(&a,&b){Ok(d)=>{ui.heading(format!("{:.4} {}",d.value,d.unit.map(|u|u.symbol()).unwrap_or("unidades da cena")));},Err(e)=>{ui.colored_label(Color32::LIGHT_RED,e.to_string());}}
+    match self.scene.distance(&a,&b){Ok(d)=>{ui.heading(format!("{:.*} {}",self.scene.view.decimals,d.value,d.unit.map(|u|u.symbol()).unwrap_or("unidades da cena")));},Err(e)=>{ui.colored_label(palette.error,e.to_string());}}
+    if let (Ok(pa),Ok(pb))=(self.scene.anchor_position(&a,false),self.scene.anchor_position(&b,false)){
+     let (factor,unit)=self.scene.scale_factor().ok().flatten().map(|(f,u)|(f,u.symbol())).unwrap_or((1.,"u. cena"));let delta=std::array::from_fn::<_,3,_>(|i|(pb[i]-pa[i])*factor);
+     ui.label(format!("ΔX {:.*} · ΔY {:.*} · ΔZ {:.*} {}",self.scene.view.decimals,delta[0],self.scene.view.decimals,delta[1],self.scene.view.decimals,delta[2],unit));
+    }
     ui.horizontal(|ui|{ui.label("Nome");ui.text_edit_singleline(&mut self.measure_name);});if ui.button("Registrar distância").clicked(){let result=self.scene.add_measurement(a.clone(),b.clone(),self.measure_name.clone());match result{Ok(_)=>{self.dirty=true;self.notice(Ok(()),"Medição registrada com incerteza desconhecida.");},Err(e)=>self.notice(Err(e),"")}}
     ui.separator();ui.label(RichText::new("Definir escala por distância conhecida").strong());ui.horizontal(|ui|{ui.add(egui::DragValue::new(&mut self.known_distance).speed(0.1).range(1e-9..=1e12));egui::ComboBox::from_id_salt("length_unit").selected_text(self.length_unit.symbol()).show_ui(ui,|ui|{ui.selectable_value(&mut self.length_unit,LengthUnit::Millimetre,"mm");ui.selectable_value(&mut self.length_unit,LengthUnit::Metre,"m");});});ui.label("Origem / método da referência");ui.text_edit_singleline(&mut self.scale_provenance);
     if ui.button("Aplicar referência de escala").clicked(){let result=self.scene.calibrate(a,b,self.known_distance,self.length_unit,self.scale_provenance.clone());if result.is_ok(){self.dirty=true;}self.notice(result,"Escala declarada. Geometria original preservada.");}
    }
-   ui.separator();match self.scene.scale_factor(){Ok(Some((_,unit)))=>{ui.label(RichText::new(format!("Escala declarada em {}",unit.symbol())).color(ACCENT));},Ok(None)=>{ui.label("Escala física desconhecida; valores em unidades da cena.");},Err(e)=>{ui.colored_label(Color32::LIGHT_RED,e.to_string());}}
+   ui.separator();match self.scene.scale_factor(){Ok(Some((_,unit)))=>{ui.label(RichText::new(format!("Escala declarada em {}",unit.symbol())).color(palette.primary));},Ok(None)=>{ui.label("Escala física desconhecida; valores em unidades da cena.");},Err(e)=>{ui.colored_label(palette.warning,e.to_string());}}
    if self.scene.calibration.is_some()&&ui.button("Remover referência de escala").clicked(){self.scene.calibration=None;self.dirty=true;}
-   ui.label(RichText::new("Incerteza desconhecida. Escala declarada não garante exatidão metrológica.").size(10.).color(MUTED));
-   let mut remove=None;egui::ScrollArea::vertical().max_height(180.).show(ui,|ui|{for m in &self.scene.measurements{ui.horizontal(|ui|{let text=match self.scene.distance(&m.a,&m.b){Ok(d)=>format!("{}: {:.3} {}",m.name,d.value,d.unit.map(|u|u.symbol()).unwrap_or("u. cena")),Err(_)=>format!("{}: recalibrar",m.name)};ui.label(text);if ui.small_button("Remover").clicked(){remove=Some(m.id.clone());}});}});
+   ui.label(RichText::new("Incerteza desconhecida. Escala declarada não garante exatidão metrológica.").size(10.).color(palette.secondary));
+   let mut remove=None;egui::ScrollArea::vertical().max_height(180.).show(ui,|ui|{for m in &self.scene.measurements{ui.horizontal(|ui|{let text=match self.scene.distance(&m.a,&m.b){Ok(d)=>format!("{}: {:.*} {}",m.name,self.scene.view.decimals,d.value,d.unit.map(|u|u.symbol()).unwrap_or("u. cena")),Err(_)=>format!("{}: recalibrar",m.name)};ui.label(text);if ui.small_button("Remover").clicked(){remove=Some(m.id.clone());}});}});
    if let Some(id)=remove{self.scene.measurements.retain(|m|m.id!=id);self.dirty=true;}
    if ui.add_enabled(!self.scene.measurements.is_empty(),egui::Button::new("Exportar relatório de medições")).clicked(){self.choose(Purpose::ExportMeasurements);}
-   ui.label(RichText::new("Salvar revisão do workspace preserva medidas, âncoras e referência de escala.").size(10.).color(MUTED));
+   ui.label(RichText::new("Salvar revisão do workspace preserva medidas, âncoras e referência de escala.").size(10.).color(palette.secondary));
+   });
   });
-        self.show_measurements = open;
+        self.show_measurements = open && !requested_pick;
         if !open {
             self.measure_mode = false;
         }
+    }
+}
+
+impl Desktop {
+    fn palette(&self) -> theme::Palette {
+        theme::Palette::new(self.scene.view.theme)
+    }
+    fn stop_transition(&mut self) {
+        self.hover_anchor = None;
+        self.hover_pixel = None;
+        if let Some(t) = self.transition.take() {
+            self.scene.explosion = t.value();
+            self.scene.camera = t.camera();
+        }
+    }
+    fn animate_explosion(&mut self, target: f64) {
+        self.stop_transition();
+        let from = self.scene.explosion;
+        let camera_from = self.scene.camera.clone();
+        self.scene.explosion = target;
+        if let Err(e) = self
+            .scene
+            .validate_world()
+            .and_then(|()| self.scene.fit(false))
+        {
+            self.scene.explosion = from;
+            self.scene.camera = camera_from;
+            self.notice(Err(e), "");
+            return;
+        }
+        if !self.scene.view.reduced_motion && (from - target).abs() > 1e-9 {
+            self.transition = Some(animation::ExplosionTransition {
+                from,
+                to: target,
+                camera_from,
+                camera_to: self.scene.camera.clone(),
+                elapsed: 0.,
+                duration: 0.9,
+            });
+        }
+        self.hover_anchor = None;
+        self.measure_mode = false;
+        self.dirty = true;
+        self.notice(
+            Ok(()),
+            if self.transition.is_some() {
+                if target > 0. {
+                    "Separando componentes · geometria original preservada"
+                } else {
+                    "Remontando o conjunto"
+                }
+            } else if target > 0. {
+                "Vista explodida aplicada; geometria original preservada."
+            } else {
+                "Conjunto remontado."
+            },
+        );
+    }
+    fn preset(&mut self, view: &str) {
+        self.stop_transition();
+        self.scene.camera.projection = Projection::Orthographic;
+        match view {
+            "Frontal" => {
+                self.scene.camera.yaw = -std::f64::consts::FRAC_PI_2;
+                self.scene.camera.pitch = 0.;
+            }
+            "Superior" => {
+                self.scene.camera.yaw = -std::f64::consts::FRAC_PI_2;
+                self.scene.camera.pitch = std::f64::consts::FRAC_PI_2;
+            }
+            "Lateral" => {
+                self.scene.camera.yaw = 0.;
+                self.scene.camera.pitch = 0.;
+            }
+            _ => {
+                self.scene.camera.yaw = -1.1;
+                self.scene.camera.pitch = 0.45;
+            }
+        }
+        let r = self.scene.fit(false);
+        self.notice(r, "Vista ortográfica aplicada. Réguas uniformes na tela.");
+        self.dirty = true;
+    }
+    fn visual_window(&mut self, ctx: &egui::Context) {
+        let palette = self.palette();
+        let mut open = self.show_visual;
+        egui::Window::new("Visualização · Arctic").open(&mut open).default_width(390.).show(ctx,|ui|{
+   ui.label(RichText::new("APARÊNCIA").size(11.).color(palette.secondary));
+   ui.horizontal(|ui|{if ui.selectable_value(&mut self.scene.view.theme,ThemeMode::ArcticDark,"Arctic Dark").changed(){self.dirty=true;}
+if ui.selectable_value(&mut self.scene.view.theme,ThemeMode::ArcticLight,"Arctic Light").changed(){self.dirty=true;}});
+   ui.separator();ui.label("PROJEÇÃO");
+   ui.horizontal(|ui|{if ui.selectable_value(&mut self.scene.camera.projection,Projection::Perspective,"Perspectiva").changed(){let projection=self.scene.camera.projection;self.stop_transition();self.scene.camera.projection=projection;self.dirty=true;}
+if ui.selectable_value(&mut self.scene.camera.projection,Projection::Orthographic,"Ortográfica").changed(){let projection=self.scene.camera.projection;self.stop_transition();self.scene.camera.projection=projection;self.dirty=true;}});
+   ui.horizontal(|ui|{for name in ["Frontal","Superior","Lateral"]{if ui.button(name).clicked(){self.preset(name);}}});
+   ui.label(RichText::new("Ortográfica: escala uniforme. Perspectiva: régua referida ao plano do alvo, não a todas as profundidades.").size(11.).color(palette.secondary));
+   ui.separator();
+   for (value,label) in [(&mut self.scene.view.rulers,"Réguas e escala"),(&mut self.scene.view.axes,"Eixos de orientação"),(&mut self.scene.view.annotations,"Anotações de medida"),(&mut self.scene.grid,"Grade de navegação"),(&mut self.scene.wireframe,"Arame / arestas"),(&mut self.scene.view.reduced_motion,"Reduzir movimentos")]{if ui.checkbox(value,label).changed(){self.dirty=true;}}
+   ui.label("E4 · SELEÇÃO DE VÉRTICES");if ui.add(egui::Slider::new(&mut self.scene.view.snap_radius,3.0..=24.0).text("Raio / px")).changed(){self.dirty=true;}
+   if ui.checkbox(&mut self.scene.view.selected_only,"Somente peça/montagem selecionada").changed(){self.dirty=true;}
+   if ui.checkbox(&mut self.scene.view.occlusion,"Evitar vértices atrás de faces").changed(){self.dirty=true;}
+   if ui.add(egui::Slider::new(&mut self.scene.view.decimals,0..=9).text("Casas decimais")).changed(){self.dirty=true;}
+   ui.label(RichText::new("Casas decimais alteram a exibição, não a exatidão física. Preferências acompanham o workspace.").size(10.).color(palette.secondary));
+  });
+        self.show_visual = open;
     }
 }
