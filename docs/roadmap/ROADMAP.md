@@ -29,3 +29,9 @@ E2 autorizada pelo usuário após a entrega de E1. Sparse CPU executado com COLM
 real; dense implementado/testado com motor controlado, validação real bloqueada
 pela ausência de CUDA neste ambiente. E2 não tem aceite completo declarado.
 E3 permanece não iniciada. Evidências em ../quality/E2-REPORT.md.
+
+## Atualização — 2026-11-10
+Pedido do usuário autoriza E3 integrada e recorte E5 de montagem/explosão manual.
+Operações principais estão na interface; E4 não foi iniciada. Não se declara
+E5 completa: CAD/restrições, alinhamento guiado e instâncias repetidas continuam
+fora desta prévia. Relatório: ../quality/INTERFACE-MONTAGENS-REPORT.md.

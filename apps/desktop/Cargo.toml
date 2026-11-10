@@ -8,3 +8,7 @@ license = "MIT"
 noah-workspace = { path = "../../crates/workspace" }
 noah-geometry = { path = "../../crates/geometry" }
 eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "x11"] }
+noah-photogrammetry = { path = "../../crates/photogrammetry" }
+noah-pipeline = { path = "../../crates/pipeline" }
+noah-storage = { path = "../../crates/storage" }
+serde_json = "1"

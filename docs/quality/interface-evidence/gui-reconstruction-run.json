@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "run_id": "9f3cd297-039b-4c1f-80ba-586a68c709e0",
+  "started_ms": 1794322781323,
+  "finished_ms": 1794322857863,
+  "status": "succeeded",
+  "engine": "/workspace/work/colmap-tools/colmap",
+  "engine_version": "COLMAP 3.11.1 -- Structure-from-Motion and Multi-View Stereo",
+  "parameters": {
+    "engine_sha256": "bb9f869d5a32b674f5c6fdd4e42ed33ed91702823e06e6e05e1902b0bd5a6e7d",
+    "feature_gpu": "false",
+    "input_directory": "/workspace/work/e2-synthetic-images",
+    "matching_gpu": "false",
+    "max_image_size": "1600",
+    "mode": "sparse",
+    "noah_product_version": "2.0",
+    "threads": "2",
+    "timeout_ms": "600000"
+  },
+  "inputs": [
+    {
+      "original_name": "view-00.png",
+      "snapshot": "images/0000.png",
+      "sha256": "8acc6a2a1b9909da5709fedff6003639ff989accace26692e10e619fa7e1796b",
+      "bytes": 144374
+    },
+    {
+      "original_name": "view-01.png",
+      "snapshot": "images/0001.png",
+      "sha256": "cc6d7b7462f3ddd74ac5037dd8745b9200b4562d5fa0b81b536b0ccd4d0f7925",
+      "bytes": 141503
+    },
+    {
+      "original_name": "view-02.png",
+      "snapshot": "images/0002.png",
+      "sha256": "59290bee12f50194b0f493e3f179148e839607319d8775e9672bfa687f4464a1",
+      "bytes": 137768
+    },
+    {
+      "original_name": "view-03.png",
+      "snapshot": "images/0003.png",
+      "sha256": "d3bd95162f7ed0b167a0ca40986f78696a3e6fe4f5c9b91ba126b4557d3d5ec5",
+      "bytes": 135301
+    },
+    {
+      "original_name": "view-04.png",
+      "snapshot": "images/0004.png",
+      "sha256": "684dc6e5a063597f40acbd4b21632449e0232a7d3b2b287726c522e91a4d5026",
+      "bytes": 134456
+    },
+    {
+      "original_name": "view-05.png",
+      "snapshot": "images/0005.png",
+      "sha256": "cddd9b6559f854e7df0cfd87f63169fd87f36620df063429a9147932debef9c8",
+      "bytes": 131781
+    },
+    {
+      "original_name": "view-06.png",
+      "snapshot": "images/0006.png",
+      "sha256": "f0bdb31aaa3132a0e2394f630eeafdad415403637798bb4923435dd9191fe8c0",
+      "bytes": 130177
+    },
+    {
+      "original_name": "view-07.png",
+      "snapshot": "images/0007.png",
+      "sha256": "8471b7d990bf16dfd863b991fc08ded8fc5b4aab7b786b3538392a4b004f20d3",
+      "bytes": 131765
+    },
+    {
+      "original_name": "view-08.png",
+      "snapshot": "images/0008.png",
+      "sha256": "0c9ff3463d07b0712fa28a4c7a990c4480a63f3478a6ddc8d8c57774272c9571",
+      "bytes": 132878
+    },
+    {
+      "original_name": "view-09.png",
+      "snapshot": "images/0009.png",
+      "sha256": "8f17cbf467d95fe24550dab699307cb54834a1a266447eaf00b6b0c7dc80a745",
+      "bytes": 135764
+    },
+    {
+      "original_name": "view-10.png",
+      "snapshot": "images/0010.png",
+      "sha256": "ae412b68b33138d5386dc845b5961d310d9931c5b6ac63465425261dccd1dd3a",
+      "bytes": 139647
+    },
+    {
+      "original_name": "view-11.png",
+      "snapshot": "images/0011.png",
+      "sha256": "f71f2035fbc93477444ab0c24edf26769cdaa4be361dbf2f9855686ed5ff50a3",
+      "bytes": 143482
+    }
+  ],
+  "steps": [
+    {
+      "name": "version",
+      "arguments": [
+        "--help"
+      ],
+      "started_ms": 1794322781351,
+      "finished_ms": 1794322781535,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/00-version.stdout.log",
+      "stderr": "logs/00-version.stderr.log"
+    },
+    {
+      "name": "features",
+      "arguments": [
+        "feature_extractor",
+        "--database_path",
+        "/workspace/work/interface-smoke/reconstrucao-001/database.db",
+        "--image_path",
+        "/workspace/work/interface-smoke/reconstrucao-001/images",
+        "--ImageReader.camera_model",
+        "SIMPLE_RADIAL",
+        "--SiftExtraction.use_gpu",
+        "0",
+        "--SiftExtraction.num_threads",
+        "2",
+        "--SiftExtraction.max_image_size",
+        "1600"
+      ],
+      "started_ms": 1794322781537,
+      "finished_ms": 1794322789860,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/01-features.stdout.log",
+      "stderr": "logs/01-features.stderr.log"
+    },
+    {
+      "name": "matching",
+      "arguments": [
+        "exhaustive_matcher",
+        "--database_path",
+        "/workspace/work/interface-smoke/reconstrucao-001/database.db",
+        "--SiftMatching.use_gpu",
+        "0",
+        "--SiftMatching.num_threads",
+        "2"
+      ],
+      "started_ms": 1794322789861,
+      "finished_ms": 1794322817213,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/02-matching.stdout.log",
+      "stderr": "logs/02-matching.stderr.log"
+    },
+    {
+      "name": "mapping",
+      "arguments": [
+        "mapper",
+        "--database_path",
+        "/workspace/work/interface-smoke/reconstrucao-001/database.db",
+        "--image_path",
+        "/workspace/work/interface-smoke/reconstrucao-001/images",
+        "--output_path",
+        "/workspace/work/interface-smoke/reconstrucao-001/sparse",
+        "--Mapper.num_threads",
+        "2"
+      ],
+      "started_ms": 1794322817214,
+      "finished_ms": 1794322857393,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/03-mapping.stdout.log",
+      "stderr": "logs/03-mapping.stderr.log"
+    },
+    {
+      "name": "convert_0",
+      "arguments": [
+        "model_converter",
+        "--input_path",
+        "/workspace/work/interface-smoke/reconstrucao-001/sparse/0",
+        "--output_path",
+        "/workspace/work/interface-smoke/reconstrucao-001/model-0",
+        "--output_type",
+        "TXT"
+      ],
+      "started_ms": 1794322857395,
+      "finished_ms": 1794322857763,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/04-convert_0.stdout.log",
+      "stderr": "logs/04-convert_0.stderr.log"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "exports/sparse.ply",
+      "kind": "sparse_point_cloud",
+      "sha256": "9b8607615380da8805acd241f5198ac4b2d3353712384d199e325c1f604a082a",
+      "bytes": 513044
+    },
+    {
+      "path": "exports/reconstruction.json",
+      "kind": "cameras_and_poses",
+      "sha256": "63d330606666e70767b7c8297a389677e3d78b17a2d71775784418ace8d0d44d",
+      "bytes": 82897
+    },
+    {
+      "path": "model-0/cameras.txt",
+      "kind": "colmap_text_model",
+      "sha256": "a02d5b0b9d11a843ff1711d8e6814b45d18e973bacb624aeb2bd4f9bb65827b5",
+      "bytes": 1002
+    },
+    {
+      "path": "model-0/images.txt",
+      "kind": "colmap_text_model",
+      "sha256": "d122c30376e9666786eb83d32e053ac14605930059d0e5de7af250e1e7ee97b0",
+      "bytes": 2898631
+    },
+    {
+      "path": "model-0/points3D.txt",
+      "kind": "colmap_text_model",
+      "sha256": "e99afb188e1932e81ac365d13ce2ac91d1a20bba6f8cfae0766162cbc19cf323",
+      "bytes": 1098104
+    }
+  ],
+  "diagnostic": null
+}

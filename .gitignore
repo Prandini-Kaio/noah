@@ -6,3 +6,5 @@
 .vscode/
 # Datasets locais grandes e dados privados
 /local-data/
+
+/dist/
