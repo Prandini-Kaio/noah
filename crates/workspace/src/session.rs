@@ -1,4 +1,4 @@
-//! Sessão schema 1: referências verificadas, câmera e ajustes de instância.
+//! Sessão schema 3 (leitura 1/2): referências verificadas, câmera e ajustes de instância.
 use crate::{Camera, Placement, Result, Scene, Source, source_fingerprint};
 use noah_pipeline::{read_bounded, write_new};
 use serde::{Deserialize, Serialize};
@@ -33,6 +33,10 @@ struct Session {
     explosion: f64,
     #[serde(default = "default_distance")]
     explosion_distance: f64,
+    #[serde(default)]
+    calibration: Option<crate::measurement::ScaleReference>,
+    #[serde(default)]
+    measurements: Vec<crate::measurement::Measurement>,
 }
 fn default_distance() -> f64 {
     1.
@@ -40,6 +44,7 @@ fn default_distance() -> f64 {
 fn validate_options(scene: &Scene) -> Result<()> {
     scene.camera.validate()?;
     scene.validate_world()?;
+    scene.validate_measurements()?;
     if !scene.point_size.is_finite() || !(1.0..=8.0).contains(&scene.point_size) {
         return Err("tamanho de ponto inválido".into());
     }
@@ -61,7 +66,7 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
         item.validate()?;
     }
     let session = Session {
-        schema_version: 2,
+        schema_version: 3,
         sources: scene.sources.clone(),
         entities: scene
             .items
@@ -83,6 +88,8 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
         assemblies: scene.assemblies.clone(),
         explosion: scene.explosion,
         explosion_distance: scene.explosion_distance,
+        calibration: scene.calibration.clone(),
+        measurements: scene.measurements.clone(),
     };
     let bytes = serde_json::to_vec_pretty(&session)?;
     if bytes.len() > 4 * 1024 * 1024 {
@@ -92,7 +99,7 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
 }
 pub fn load(path: &Path) -> Result<Scene> {
     let saved: Session = serde_json::from_slice(&read_bounded(path, 4 * 1024 * 1024)?)?;
-    if !matches!(saved.schema_version, 1 | 2)
+    if !matches!(saved.schema_version, 1..=3)
         || saved.sources.len() > 32
         || saved.entities.len() > 1000
     {
@@ -136,6 +143,8 @@ pub fn load(path: &Path) -> Result<Scene> {
     scene.assemblies = saved.assemblies;
     scene.explosion = saved.explosion;
     scene.explosion_distance = saved.explosion_distance;
+    scene.calibration = saved.calibration;
+    scene.measurements = saved.measurements;
     scene.camera = saved.camera;
     scene.selected = saved.selected;
     scene.point_size = saved.point_size;
