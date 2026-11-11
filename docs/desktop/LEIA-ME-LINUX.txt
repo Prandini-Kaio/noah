@@ -78,3 +78,10 @@ Seleção exata/coordenadas aceita índices de vértices originais (começam em 
 Até nove casas decimais controlam exibição, não exatidão física.
 Salvar revisão preserva tema/projeção/preferências em sessão 4 (lê sessões 1–3).
 Mantenha revisões antigas se precisar abrir o workspace em versões anteriores.
+
+ESTILHAÇOS E LAYOUT
+Em Montagem, use Explosão e estilhaços > Estilhaçar > Explodir. Pause, ajuste
+Tempo, Remonte ou Restaure. O efeito dispersa fragmentos de superfície sem alterar
+a malha. Nuvens dispersam pontos. Componentes mantém a vista explodida técnica.
+A estrutura tem busca e painéis redimensionáveis/ocultáveis. Medidas fica na aba
+Análise do inspetor; tamanho de pontos fica em Visualização.
