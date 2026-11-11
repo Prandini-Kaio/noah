@@ -168,7 +168,7 @@ impl Browser {
                                 }
                             }
                             Err(error) => {
-                                ui.colored_label(egui::Color32::LIGHT_RED, error.to_string());
+                                ui.colored_label(ui.visuals().error_fg_color, error.to_string());
                             }
                         }
                     });
@@ -180,7 +180,7 @@ impl Browser {
                     });
                 }
                 if !self.error.is_empty() {
-                    ui.colored_label(egui::Color32::LIGHT_RED, &self.error);
+                    ui.colored_label(ui.visuals().error_fg_color, &self.error);
                 }
                 ui.horizontal(|ui| {
                     if ui.button("Cancelar").clicked() {

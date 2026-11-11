@@ -12,6 +12,13 @@ pub fn mul(a: [f64; 3], s: f64) -> [f64; 3] {
 pub fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
     a.into_iter().zip(b).map(|(a, b)| a * b).sum()
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Projection {
+    #[default]
+    Perspective,
+    Orthographic,
+}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Camera {
@@ -19,6 +26,8 @@ pub struct Camera {
     pub distance: f64,
     pub yaw: f64,
     pub pitch: f64,
+    #[serde(default)]
+    pub projection: Projection,
 }
 impl Default for Camera {
     fn default() -> Self {
@@ -27,6 +36,7 @@ impl Default for Camera {
             distance: 5.,
             yaw: -1.1,
             pitch: 0.45,
+            projection: Projection::Perspective,
         }
     }
 }
@@ -38,7 +48,7 @@ impl Camera {
             || !self.yaw.is_finite()
             || self.yaw.abs() > 1e6
             || !self.pitch.is_finite()
-            || self.pitch.abs() > 1.55
+            || self.pitch.abs() > std::f64::consts::FRAC_PI_2
         {
             return Err("estado de câmera fora dos limites".into());
         }
@@ -66,16 +76,27 @@ impl Camera {
         let (eye, right, up, forward) = self.basis();
         let delta = sub(point, eye);
         let depth = dot(delta, forward);
-        if !depth.is_finite() || depth <= self.distance * 1e-5 {
+        if !depth.is_finite()
+            || (self.projection == Projection::Perspective && depth <= self.distance * 1e-5)
+        {
             return None;
         }
         let focal = size[1] * 0.5 / (25f64.to_radians().tan());
+        let depth_for_scale = if self.projection == Projection::Orthographic {
+            self.distance
+        } else {
+            depth
+        };
         let result = [
-            size[0] * 0.5 + dot(delta, right) * focal / depth,
-            size[1] * 0.5 - dot(delta, up) * focal / depth,
+            size[0] * 0.5 + dot(delta, right) * focal / depth_for_scale,
+            size[1] * 0.5 - dot(delta, up) * focal / depth_for_scale,
             depth,
         ];
         result.iter().all(|v| v.is_finite()).then_some(result)
+    }
+    /// Unidades da cena por pixel no plano do alvo; uniforme em ortográfica.
+    pub fn units_per_pixel(&self, height: f64) -> f64 {
+        2. * self.distance * 25f64.to_radians().tan() / height
     }
     pub fn orbit(&mut self, delta: [f64; 2]) {
         self.yaw = (self.yaw - delta[0] * 0.008).rem_euclid(std::f64::consts::TAU);

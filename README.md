@@ -13,7 +13,7 @@ fotogrametria e explorar resultados em um workspace desktop.
 | E4 — Medições iniciais | Distâncias entre vértices, escala declarada, anotações e relatórios; sem validação metrológica |
 | Recorte E5 — Montagens | Hierarquia manual, exemplo de dez peças e vista explodida reversível |
 
-Snapshot de desenvolvimento: 35 testes passaram em Linux x86_64. O resultado
+Snapshot de desenvolvimento: 47 testes passaram em Linux x86_64. O resultado
 esparso incluído contém 7.592 pontos. Não são prometidas precisão metrológica,
 compatibilidade universal de formatos ou execução gráfica em todos os sistemas.
 
@@ -25,6 +25,33 @@ cd noah
 ```
 
 Também é possível baixar em **Code → Download ZIP**.
+
+## Workspace reorganizado e estilhaços
+
+Navegue por Captura, Reconstrução, Montagem, Inspeção, Medidas e Exportação sem
+perder a cena. A estrutura tem busca; painéis laterais são redimensionáveis e
+ocultáveis; o inspetor reúne propriedades, análise e seções recolhíveis.
+
+Em **Montagem → Explosão e estilhaços → Estilhaçar → Explodir**, até uma malha
+única se dispersa em fragmentos visuais com rotação. Pause, ajuste o tempo,
+remonte ou restaure instantaneamente. O modo **Componentes** conserva a vista
+explodida técnica. A prévia não altera fontes, exportação ou medições e não é
+salva na sessão. [Guia e limites](docs/desktop/ESTILHACOS-LAYOUT.md).
+
+![Workspace e estilhaços](docs/desktop/estilhacos.png)
+
+## Arctic: interface e visualização
+
+Arctic Dark é o padrão; Arctic Light está em **Preferências → Tema e opções visuais**. Explosão e remontagem
+agora têm transição animada, com opção de movimento reduzido. O menu **Exibição** também
+reúne projeção ortográfica, vistas frontal/superior/lateral, réguas calibradas,
+eixos e controles de seleção. **Medir** oferece snap frontal e entrada por
+índice original, coordenadas/deltas e casas decimais de exibição.
+
+[Guia Arctic e limites](docs/desktop/ARCTIC.md). Réguas em perspectiva valem no
+plano do alvo; em ortográfica a escala é uniforme. Não garantem exatidão física.
+
+![Arctic Dark](docs/desktop/arctic-dark.png)
 
 ## Usar a interface no Linux
 
@@ -68,7 +95,7 @@ no inspetor. Salve cada sessão com um nome novo. As fontes são preservadas.
 
 O renderer inicial usa projeção CPU e desenho OpenGL/egui, ordenação aproximada
 por profundidade e amostra de até 50 mil pontos/20 mil faces. Não possui z-buffer
-3D, edição topológica, CAD ou ferramentas de medição nesta etapa.
+3D, edição topológica ou CAD.
 
 ## Reconstrução com COLMAP
 
@@ -92,7 +119,9 @@ com hardware real nesta entrega. Não há download de dados nem telemetria do NO
 - [Pacote e instruções](LEIA-ME-PACOTE.md)
 - [Relatório E1](docs/quality/E1-REPORT.md)
 - [Relatório E2](docs/quality/E2-REPORT.md)
-- [Medições e escala — relatório atual](docs/quality/E4-REPORT.md)
+- [Estilhaços e layout — relatório atual](docs/quality/ESTILHACOS-REPORT.md)
+- [Arctic — relatório](docs/quality/ARCTIC-REPORT.md)
+- [Medições e escala — relatório](docs/quality/E4-REPORT.md)
 - [Interface integrada e montagem — relatório](docs/quality/INTERFACE-MONTAGENS-REPORT.md)
 - [Relatório E3 histórico](docs/quality/E3-REPORT.md)
 - [Roadmap](docs/roadmap/ROADMAP.md)

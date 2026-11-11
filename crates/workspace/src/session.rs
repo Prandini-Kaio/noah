@@ -1,4 +1,4 @@
-//! Sessão schema 3 (leitura 1/2): referências verificadas, câmera e ajustes de instância.
+//! Sessão schema 4 (leitura 1/2/3): referências verificadas, câmera e ajustes de instância.
 use crate::{Camera, Placement, Result, Scene, Source, source_fingerprint};
 use noah_pipeline::{read_bounded, write_new};
 use serde::{Deserialize, Serialize};
@@ -37,12 +37,15 @@ struct Session {
     calibration: Option<crate::measurement::ScaleReference>,
     #[serde(default)]
     measurements: Vec<crate::measurement::Measurement>,
+    #[serde(default)]
+    view: crate::view::ViewOptions,
 }
 fn default_distance() -> f64 {
     1.
 }
 fn validate_options(scene: &Scene) -> Result<()> {
     scene.camera.validate()?;
+    scene.view.validate()?;
     scene.validate_world()?;
     scene.validate_measurements()?;
     if !scene.point_size.is_finite() || !(1.0..=8.0).contains(&scene.point_size) {
@@ -66,7 +69,7 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
         item.validate()?;
     }
     let session = Session {
-        schema_version: 3,
+        schema_version: 4,
         sources: scene.sources.clone(),
         entities: scene
             .items
@@ -90,6 +93,7 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
         explosion_distance: scene.explosion_distance,
         calibration: scene.calibration.clone(),
         measurements: scene.measurements.clone(),
+        view: scene.view.clone(),
     };
     let bytes = serde_json::to_vec_pretty(&session)?;
     if bytes.len() > 4 * 1024 * 1024 {
@@ -99,7 +103,7 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
 }
 pub fn load(path: &Path) -> Result<Scene> {
     let saved: Session = serde_json::from_slice(&read_bounded(path, 4 * 1024 * 1024)?)?;
-    if !matches!(saved.schema_version, 1..=3)
+    if !matches!(saved.schema_version, 1..=4)
         || saved.sources.len() > 32
         || saved.entities.len() > 1000
     {
@@ -145,6 +149,7 @@ pub fn load(path: &Path) -> Result<Scene> {
     scene.explosion_distance = saved.explosion_distance;
     scene.calibration = saved.calibration;
     scene.measurements = saved.measurements;
+    scene.view = saved.view;
     scene.camera = saved.camera;
     scene.selected = saved.selected;
     scene.point_size = saved.point_size;

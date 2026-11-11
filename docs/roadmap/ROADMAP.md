@@ -40,3 +40,15 @@ fora desta prévia. Relatório: ../quality/INTERFACE-MONTAGENS-REPORT.md.
 Distâncias entre vértices, referência de escala explícita e anotações persistidas
 implementadas na interface. E4 completa (outras primitivas/anotações) permanece
 pendente; E5 ainda manual. Relatório: ../quality/E4-REPORT.md.
+
+## Arctic — interface e controle de medição
+Paletas do usuário, Dark padrão, explosão animada, modos de projeção e réguas
+calibradas implementados. Snap frontal/índice e preferências entram na sessão 4.
+Não muda o status metrológico de E4 nem implementa fratura física/CAD.
+Relatório: ../quality/ARCTIC-REPORT.md.
+
+## Incremento autorizado: estilhaços e layout
+Implementados estilhaços temporários multidirecionais de superfície (malha única),
+playback reversível, força/tempo, painéis redimensionáveis/ocultáveis, árvore com
+busca, módulos e inspetor contextual. Sem fratura volumétrica, cortes ou colisões.
+Guia: docs/desktop/ESTILHACOS-LAYOUT.md. Plano: ESTILHACOS-LAYOUT.md.

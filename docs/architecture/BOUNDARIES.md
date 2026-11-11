@@ -46,3 +46,9 @@ sem revalidar fotos a cada frame; a abertura final valida os artefatos.
 Workspace compõe hierarquia e deslocamentos de explosão e persiste sessão 2;
 domínio geométrico permanece independente da UI. Projetos E1/runs E2 não mudam
 de schema. Explosão afeta apenas visualização; export de peça usa estado montado.
+
+## Estilhaços e organização Arctic
+Desktop `blast` mantém apenas um cache visual de fragmentos. Não grava malhas,
+objetos ou medidas; usa transforms e primitives do workspace, sem dependência
+inversa. `shell` organiza navegação e contexto; domínio/sessão schema 4 não mudam.
+Fratura volumétrica/colisões não fazem parte deste efeito. Contrato: ADR 0008.
