@@ -10,10 +10,10 @@ fotogrametria e explorar resultados em um workspace desktop.
 | E1 — Fundação | PLY ASCII XYZ/RGB, transformações, projetos persistidos e CLI validados |
 | E2 — Fotogrametria | COLMAP 3.11.x esparso validado com 12 imagens sintéticas; densificação real pendente de CUDA |
 | E3 — Workspace desktop | Fluxos principais pela interface, reconstrução acompanhada e sessões verificadas |
-| E4 — Medições iniciais | Distâncias entre vértices, escala declarada, anotações e relatórios; sem validação metrológica |
+| E4 — Medições iniciais | Distâncias, ângulos ABC, dimensões XYZ, escala, anotações e relatórios; sem validação metrológica |
 | Recorte E5 — Montagens | Hierarquia manual, exemplo de dez peças e vista explodida reversível |
 
-Snapshot de desenvolvimento: 47 testes passaram em Linux x86_64. O resultado
+Snapshot de desenvolvimento: 54 testes passaram em Linux x86_64. O resultado
 esparso incluído contém 7.592 pontos. Não são prometidas precisão metrológica,
 compatibilidade universal de formatos ou execução gráfica em todos os sistemas.
 
@@ -25,6 +25,20 @@ cd noah
 ```
 
 Também é possível baixar em **Code → Download ZIP**.
+
+## Inspeção E4: ângulos e dimensões
+
+Em **Medidas**, use Distância, Ângulo (ABC no vértice B) ou Dimensões XYZ.
+Seleção por snap ou índices originais; as caixas usam todos os vértices da peça
+ou montagem, incluindo filhos ocultos, no estado montado. Ângulos independem da
+calibração; comprimentos físicos exigem uma escala válida.
+
+O pacote Linux inclui `examples/inspection-box.obj`: caixa de 2×3×4 u. cena,
+ângulo 6–5–8 = 90°. Declarar 200 mm na aresta 2–1 resulta em 200×300×400 mm.
+Sessão 5 lê as versões 1–4; relatório 2 inclui fontes, âncoras e transformações.
+[Guia e limites](docs/desktop/E4-INSPECAO.md).
+
+![Inspeção de ângulo e dimensões](docs/desktop/e4-inspecao.png)
 
 ## Workspace reorganizado e estilhaços
 
@@ -119,7 +133,8 @@ com hardware real nesta entrega. Não há download de dados nem telemetria do NO
 - [Pacote e instruções](LEIA-ME-PACOTE.md)
 - [Relatório E1](docs/quality/E1-REPORT.md)
 - [Relatório E2](docs/quality/E2-REPORT.md)
-- [Estilhaços e layout — relatório atual](docs/quality/ESTILHACOS-REPORT.md)
+- [E4: ângulos e dimensões — relatório atual](docs/quality/E4-INSPECAO-REPORT.md)
+- [Estilhaços e layout — relatório](docs/quality/ESTILHACOS-REPORT.md)
 - [Arctic — relatório](docs/quality/ARCTIC-REPORT.md)
 - [Medições e escala — relatório](docs/quality/E4-REPORT.md)
 - [Interface integrada e montagem — relatório](docs/quality/INTERFACE-MONTAGENS-REPORT.md)

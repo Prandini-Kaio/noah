@@ -1,0 +1,13 @@
+EXEMPLO DE INSPEÇÃO — NOAH
+inspection-box.obj: caixa sintética com 8 vértices e 12 triângulos, dimensões
+2 x 3 x 4 unidades de cena. Sem unidade física codificada no arquivo.
+Gerada para NOAH; dados dedicados ao domínio público sob CC0-1.0.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Abra NOAH > Importar > Geometria e escolha inspection-box.obj desta pasta.
+Selecione a peça na árvore. Em Medidas > Ângulo > Seleção exata, use A=6, B=5,
+C=8 (índices começam em 1): 90 graus. B é o vértice do ângulo.
+Para calibrar, em Distância use A=2 e B=1; declare distância conhecida 200 mm.
+Dimensões XYZ deve exibir 200 x 300 x 400 mm. Esses números são referências
+sintéticas declaradas; não constituem validação metrológica de captura real.
+Registrar grava a definição da medida; Salvar cria uma nova sessão.

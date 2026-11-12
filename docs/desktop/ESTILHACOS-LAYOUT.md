@@ -62,3 +62,6 @@ A especificação visual anexada orientou hierarquia e agrupamento. Seção de c
 ângulo/área/volume, bibliotecas de ícones e novas fontes não foram implementados:
 continuam em uso as fontes distribuídas/licenciadas pelo egui. Não há controles
 que prometam esses recursos futuros.
+
+Atualização E4: ângulos e dimensões disponíveis na prévia v0.6; sessões novas
+são versão 5. Consulte [Inspeção E4](E4-INSPECAO.md) para o comportamento atual.

@@ -52,3 +52,12 @@ Implementados estilhaços temporários multidirecionais de superfície (malha ú
 playback reversível, força/tempo, painéis redimensionáveis/ocultáveis, árvore com
 busca, módulos e inspetor contextual. Sem fratura volumétrica, cortes ou colisões.
 Guia: docs/desktop/ESTILHACOS-LAYOUT.md. Plano: ESTILHACOS-LAYOUT.md.
+
+## Estado consolidado — 2026-11-12
+E1 validada; E2 sparse CPU validada, dense/CUDA real pendente. E3 desktop entregue
+em prévias Linux. E4 agora inclui distâncias, ângulos ABC, caixas XYZ, calibração,
+anotações e relatório 2; criação de primitivas e validação física permanecem fora
+deste incremento. E5 tem hierarquia manual/explosão e efeito de estilhaços visual;
+alinhamento guiado e instâncias repetidas ainda pendentes. E6/E7/E8 não iniciadas.
+PRs Arctic/estilhaços integrados no ramo principal em 2026-11-11.
+Continuação E4: plano E4-ANGULOS-DIMENSOES.md, relatório ../quality/E4-INSPECAO-REPORT.md.

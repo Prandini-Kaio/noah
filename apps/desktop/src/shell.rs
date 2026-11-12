@@ -314,12 +314,7 @@ impl Desktop {
    egui::ScrollArea::vertical().id_salt("context_scroll").show(ui,|ui|{
     ui.add_enabled_ui(self.pending.is_none(),|ui|{
      if self.analysis_tab{
-      ui.heading("Medições");ui.label("Distâncias entre vértices e referência de escala.");
-      ui.label(format!("{} medidas registradas",self.scene.measurements.len()));
-      if let Some(scale)=&self.scene.calibration{ui.label(format!("Referência: {} {}",scale.known_distance,scale.unit.symbol()));}else{ui.label(RichText::new("Escala física não definida").color(p.warning));}
-      if ui.button("Abrir ferramentas de medida").clicked(){self.restore_blast();self.show_measurements=true;}
-      if ui.button("Exportar relatório…").clicked(){self.choose(Purpose::ExportMeasurements);}
-      ui.add_space(12.);ui.label(RichText::new("A escala declarada não garante exatidão física. Ângulo, área e volume ainda não estão disponíveis.").size(11.).color(p.secondary));
+      self.inspection_summary(ui);
      }else{
       match self.module{
        Module::Capture=>{ui.heading("Captura");ui.label("Escolha a pasta local de fotografias para o pipeline.");if ui.button("Importar fotos…").clicked(){self.choose(Purpose::Images);}ui.label(self.reconstruction.images.display().to_string());if ui.button("Configurar reconstrução").clicked(){self.show_reconstruction=true;}ui.separator();},

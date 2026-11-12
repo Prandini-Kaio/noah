@@ -1,87 +1,73 @@
-NOAH 2.0 — Prévia com medições e escala
+NOAH 2.0 — Prévia de inspeção, montagens e interface Arctic
 
 COMO ABRIR
-Extraia toda a pasta e abra o arquivo executável NOAH com duplo clique.
-Não precisa instalar Rust/Cargo ou abrir terminal para usar esse pacote.
-Caso o gerenciador de arquivos pergunte, escolha executar o arquivo.
+Extraia toda a pasta e abra NOAH com duplo clique. Não precisa de Rust/Cargo
+ou terminal. Se necessário, habilite execução nas propriedades do arquivo.
 
-REQUISITOS DESTE BINÁRIO
-Linux x86_64, glibc 2.39 ou superior (ex.: Ubuntu 24.04 / Debian 13),
-sessão gráfica X11 ou XWayland, bibliotecas X11/xkbcommon e OpenGL.
-Não é AppImage nem pacote universal para todas as distribuições.
-Se sua distribuição for mais antiga, compilar o código nela é alternativa
-para desenvolvedores. Não foi validado suporte nativo Wayland nesta prévia.
+REQUISITOS
+Linux x86_64, glibc 2.39+, X11 ou XWayland, X11/xkbcommon e OpenGL.
+Não é AppImage nem pacote universal. Wayland nativo não foi validado.
 
-PRIMEIRO CONTATO
-1. Clique em Explorar montagem de exemplo.
-2. Escolha uma pasta para materializar os arquivos da demonstração.
-3. Clique Criar montagem: dez peças e três montagens serão abertas.
-4. Use Montada e Explodida ou o controle de intensidade.
-5. Selecione peças/montagens e use os ajustes do inspetor.
-6. Salvar revisão cria um arquivo novo; Abrir workspace restaura a sessão.
+TESTE INCLUÍDO
+Importar > Geometria > examples/inspection-box.obj. Selecione a peça na árvore.
+Medidas > Ângulo > Seleção exata: A=6 B=5 C=8 dá 90 graus (B é o vértice).
+Em Distância, A=2 B=1; declare 200 mm e aplique a referência de escala.
+Dimensões XYZ deve indicar 200 x 300 x 400 mm. Veja examples/LEIA-ME.txt.
+Esses são dados sintéticos CC0, sem validação metrológica de captura real.
 
-SEUS ARQUIVOS
-Importar peças abre nuvens PLY ASCII XYZ/RGB e malhas OBJ triangulares.
-Projeto/run abre diretórios de projetos E1 e reconstruções E2 finalizadas.
-A estrutura à esquerda permite selecionar/ocultar peças. Crie montagens
-com o botão abaixo da árvore; no inspetor, escolha o pai de cada componente.
-A troca de pai preserva coordenadas locais, podendo mudar a posição mundial.
+WORKSPACE E MONTAGENS
+Workspace permite Novo, Abrir, Projeto/run e Explorar montagem de exemplo.
+O exemplo de montagem materializa dez peças e três grupos numa pasta escolhida.
+Importar aceita nuvens PLY ASCII XYZ/RGB e malhas OBJ triangulares. A árvore
+permite buscar, selecionar e ocultar peças; Nova montagem cria um grupo.
+No inspetor, escolha o pai e os ajustes locais. Mudar o pai preserva coordenadas
+locais e pode mudar a posição mundial. A montagem permanece manual.
 
-NAVEGAÇÃO
-Arrastar: órbita. Botão direito ou Shift + arrastar: pan. Roda: zoom.
-F ou Enquadrar: ajustar câmera. Clique em uma peça ou na árvore para selecionar.
+INTERFACE E NAVEGAÇÃO
+Módulos no topo mudam o contexto; o viewport permanece aberto. Painéis são
+redimensionáveis e ocultáveis. Maximizar amplia o viewport; Restaurar volta.
+A toolbar oferece Selecionar, Pan, Órbita, Câmera, Enquadrar e Exibição.
+Direito/meio ou Shift + arrastar: pan. Roda: zoom. F: enquadrar.
+Preferências > Tema e opções visuais oferece Arctic Dark (padrão), Light,
+movimento reduzido, réguas, anotações e controles de seleção.
+Ortográfica tem escala uniforme; em perspectiva a régua vale no plano do alvo.
+Réguas medem U/V projetados, não comprimentos 3D de qualquer aresta inclinada.
+
+EXPLOSÃO E ESTILHAÇOS
+Em Montagem/Inspeção > Explosão e estilhaços, Estilhaçar > Explodir dispersa
+fragmentos visuais. Controle força/tempo, pause, remonte ou restaure. Não altera
+fontes e não grava fragmentos na sessão. Nuvens dispersam pontos. Não há
+fratura volumétrica, interior nem colisões; limite de 20 mil fragmentos amostrados.
+Componentes conserva Separar peças/Montada e afastamento em unidades da cena.
+Abrir Medir restaura a prévia de estilhaçamento antes da seleção de vértices.
+
+MEDIÇÕES
+Medidas reúne Distância, Ângulo ABC e Dimensões XYZ; o inspetor usa a aba Análise.
+Selecione vértices por clique ou índice original (inicia em 1). A janela retorna
+após os dois/três pontos. Snap tem raio, filtro e teste frontal até 200 mil faces.
+Registre com nome. Distâncias e dimensões usam escala declarada em mm/m, com
+origem da referência. Se seu comprimento mudar, recalibre ou remova a referência.
+Ângulos de 0 a 180 graus independem de escala uniforme. Caixas XYZ incluem todos
+os filhos/vértices, mesmo ocultos, e mudam com a rotação. Não são caixas mínimas
+orientadas nem medições de volume. A explosão não muda os valores montados.
+Incerteza desconhecida; escala e casas decimais não garantem precisão física.
+
+SALVAR E EXPORTAR
+Salvar cria arquivo novo, sessão versão 5 (lê 1-4). Apps antigos não abrem versão 5.
+As definições de medidas são recalculadas ao reabrir. Fontes usam caminhos
+absolutos: não as mova/apague. A sessão não é um projeto autocontido.
+Exportação de peça usa posição montada; relatório JSON versão 2 contém medidas,
+fontes/hashes, transformações e métodos. Destinos existentes são preservados.
 
 RECONSTRUÇÃO
-Reconstruir fotos permite escolher a pasta das imagens, o executável COLMAP,
-a pasta de resultados e um nome novo. Inicie, acompanhe etapas e logs, cancele
-se necessário e use Abrir nuvem no workspace ao concluir.
-COLMAP 3.11.x deve estar instalado separadamente; ele não vem neste pacote.
-Modo esparso usa CPU. Densificação requer COLMAP CUDA e GPU compatível;
-sua validação real ainda está pendente. O app não baixa motores nem fotos.
+Reconstrução abre configuração, etapas, logs e cancelamento do pipeline.
+Escolha fotos, COLMAP 3.11.x local, destino e nome novo; depois inicie e abra a
+nuvem resultante. COLMAP não está incluído. Sparse usa CPU; dense exige CUDA/GPU
+e sua validação real continua pendente. O app não baixa motores nem fotografias.
 
-DADOS E LIMITES
-Geometria original é preservada. A explosão é apenas visual; exportação da
-peça usa a posição montada e grava metadados de unidade/referencial.
-Sessões referenciam caminhos absolutos das fontes. Não mova/apague essas
-fontes depois de salvar. Não é um arquivo autocontido de projeto.
-Montagem é manual; não há reconhecimento automático ou restrições CAD.
-Renderer tem oclusão aproximada e exibe até 50 mil pontos/20 mil faces.
-Unidades desconhecidas não são calibradas automaticamente.
-Este é software de desenvolvimento, com testes e pendências documentados.
-
-LICENÇA
-Código original MIT. Demo sintética CC0-1.0. Dependências mantêm suas licenças,
-incluídas na pasta third-party-licenses. COLMAP é um motor externo separado.
-
+LIMITES E LICENÇAS
+Renderer amostrado (50 mil pontos / 20 mil faces), profundidade aproximada,
+sem z-buffer 3D ou CAD. Dimensões usam todos os vértices, sem essa amostragem.
+Área, volume, novas primitivas e alinhamento guiado ainda não disponíveis.
+Código MIT; exemplos CC0-1.0. Licenças de dependências em third-party-licenses.
 Código e relatórios: https://github.com/Prandini-Kaio/noah
-
-MEDIÇÕES E ESCALA
-Clique Medir e Escolher pontos A e B; selecione vértices na geometria.
-Registre a distância com nome. Para escala física, declare distância conhecida,
-unidade mm/m e origem da referência. Aplicar referência não altera os pontos.
-Se transformações mudarem seu comprimento, recalibre ou remova a referência.
-Explosão não muda o valor medido; ele é calculado no estado montado.
-Salvar revisão preserva medidas e calibração. Exportar relatório gera JSON novo.
-Incerteza é desconhecida; escala declarada não garante precisão industrial.
-
-ARCTIC — VISUAL E ANIMAÇÃO
-Dark é o padrão; escolha Arctic Light em Visual. Montada/Explodida animam a
-separação e remontagem de componentes, sem quebrar a malha. Reduzir movimentos
-aplica o destino imediatamente. Navegar interrompe a animação no estado atual.
-Visual reúne réguas, eixos, anotações, grade, arame e vistas de câmera.
-Ortográfica tem escala uniforme; em perspectiva a régua vale no plano do alvo.
-Sem calibração válida, réguas usam unidades da cena. Elas medem U/V projetados,
-não o comprimento 3D de uma aresta inclinada.
-Medir recolhe a janela durante seleção; retorna após A/B. Snap tem prévia, raio
-configurável, filtro e proteção frontal para até 200 mil faces visíveis.
-Seleção exata/coordenadas aceita índices de vértices originais (começam em 1).
-Até nove casas decimais controlam exibição, não exatidão física.
-Salvar revisão preserva tema/projeção/preferências em sessão 4 (lê sessões 1–3).
-Mantenha revisões antigas se precisar abrir o workspace em versões anteriores.
-
-ESTILHAÇOS E LAYOUT
-Em Montagem, use Explosão e estilhaços > Estilhaçar > Explodir. Pause, ajuste
-Tempo, Remonte ou Restaure. O efeito dispersa fragmentos de superfície sem alterar
-a malha. Nuvens dispersam pontos. Componentes mantém a vista explodida técnica.
-A estrutura tem busca e painéis redimensionáveis/ocultáveis. Medidas fica na aba
-Análise do inspetor; tamanho de pontos fica em Visualização.

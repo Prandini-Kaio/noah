@@ -10,6 +10,7 @@ mod animation;
 mod blast;
 mod browser;
 mod jobs;
+mod metrology;
 mod shell;
 mod theme;
 mod viewport_tools;
@@ -53,6 +54,9 @@ struct Desktop {
     hover_updated: std::time::Instant,
     exact_a: usize,
     exact_b: usize,
+    exact_c: usize,
+    measurement_tool: metrology::MeasurementTool,
+    bounds_cache: metrology::BoundsCache,
     blast: Option<blast::Blast>,
     blast_mode: bool,
     blast_selected: bool,
@@ -104,6 +108,9 @@ impl Desktop {
             hover_updated: std::time::Instant::now(),
             exact_a: 1,
             exact_b: 2,
+            exact_c: 3,
+            measurement_tool: metrology::MeasurementTool::Distance,
+            bounds_cache: Default::default(),
             blast: None,
             blast_mode: true,
             blast_selected: false,
@@ -309,8 +316,8 @@ impl Desktop {
                 else if self.measure_mode && self.transition.is_some(){self.notice(Err("Aguarde o fim da animação para selecionar vértices".into()),"");}
                 else if self.measure_mode{
                     if let Some(anchor)=measurement::pick_anchor_controlled(&display_scene,point,size){
-                        if self.anchors.last()==Some(&anchor){self.notice(Err("Escolha outro vértice para o segundo ponto".into()),"");}
-                        else{self.anchors.push(anchor);if self.anchors.len()==2{self.measure_mode=false;self.show_measurements=true;self.notice(Ok(()),"Dois vértices selecionados. Abra Medir para registrar ou definir escala.");}else{self.notice(Ok(()),"Ponto A escolhido; selecione o ponto B.");}}
+                        if self.anchors.contains(&anchor){self.notice(Err("Escolha um vértice distinto dos anteriores".into()),"");}
+                        else{self.anchors.push(anchor);if self.anchors.len()==self.measurement_tool.points(){self.measure_mode=false;self.show_measurements=true;self.notice(Ok(()),"Vértices selecionados. Confira a medida antes de registrar.");}else{self.notice(Ok(()),&format!("Ponto escolhido; selecione {}.",["A","B","C"][self.anchors.len().min(2)]));}}
                     }else{let faces:usize=self.scene.items.iter().filter(|i|i.visible).map(|i|match i.geometry.as_ref(){Geometry::Mesh(m)=>m.triangles().len(),_=>0}).sum();let text=if self.scene.view.occlusion&&faces>200_000{"Proteção frontal limitada a 200 mil faces visíveis. Isole peças ou desative essa opção em Visual."}else if self.scene.view.selected_only&&self.scene.selected.is_none(){"Selecione uma peça/montagem ou desative o filtro em Visual."}else{"Nenhum vértice próximo. Aproxime a câmera e tente novamente."};self.notice(Err(text.into()),"");}
                 }else{self.scene.selected=noah_workspace::pick(&primitives,point,7.).map(|i|self.scene.items[i].id.clone());self.dirty=true;}
             }
@@ -336,8 +343,8 @@ impl Desktop {
                     display_painter.text(a+(b-a)*0.5,egui::Align2::CENTER_BOTTOM,label,FontId::proportional(11.),palette.primary);
                 }
             }
-            for (i,a) in self.anchors.iter().filter(|_|self.blast.is_none()).enumerate(){if let Some(p)=anchor_screen(a){display_painter.circle_filled(p,6.,palette.warning);display_painter.text(p+Vec2::new(10.,-10.),egui::Align2::LEFT_BOTTOM,if i==0{"A"}else{"B"},FontId::proportional(14.),Color32::WHITE);}}
-            if self.measure_mode{display_painter.text(rect.center_top()+Vec2::new(0.,25.),egui::Align2::CENTER_TOP,"MEDIÇÃO: clique nos vértices A e B",FontId::proportional(14.),palette.primary);}
+            for (i,a) in self.anchors.iter().filter(|_|self.blast.is_none()).enumerate(){if let Some(p)=anchor_screen(a){display_painter.circle_filled(p,6.,palette.warning);display_painter.text(p+Vec2::new(10.,-10.),egui::Align2::LEFT_BOTTOM,["A","B","C"].get(i).copied().unwrap_or("?"),FontId::proportional(14.),Color32::WHITE);}}
+            if self.measure_mode{display_painter.text(rect.center_top()+Vec2::new(0.,25.),egui::Align2::CENTER_TOP,if self.measurement_tool==metrology::MeasurementTool::Angle{"ÂNGULO: clique A, B (vértice), C"}else{"DISTÂNCIA: clique A e B"},FontId::proportional(14.),palette.primary);}
             if self.measure_mode&&self.transition.is_none()&&self.blast.is_none(){ctx.request_repaint_after(Duration::from_millis(75));
                 if let Some(pos)=response.hover_pos().filter(|pos|rect.contains(*pos)){
                     let pixel=[(pos.x-rect.left()) as f64,(pos.y-rect.top()) as f64];
@@ -345,6 +352,7 @@ impl Desktop {
                     if let Some(a)=&self.hover_anchor&&let Some(p)=anchor_screen(a){display_painter.circle_stroke(p,9.,Stroke::new(1.5_f32,palette.primary));display_painter.line_segment([p-Vec2::new(13.,0.),p+Vec2::new(13.,0.)],Stroke::new(1.0_f32,palette.primary));display_painter.text(p+Vec2::new(15.,-15.),egui::Align2::LEFT_BOTTOM,format!("Vértice {}",a.vertex+1),FontId::proportional(11.),palette.primary);}
                 }else{self.hover_anchor=None;self.hover_pixel=None;}
             }
+            if self.scene.view.annotations && self.blast.is_none(){self.draw_inspection(&display_scene,&display_painter,rect);}
             viewport_tools::draw(&painter,&display_scene,outer,rect,palette,response.hover_pos());
             let top=rect.left_top()+Vec2::new(22.,22.);display_painter.text(top,egui::Align2::LEFT_TOP,if display_scene.camera.projection==Projection::Orthographic{"ORTOGRÁFICA · U/V"}else{"PERSPECTIVA"},FontId::proportional(11.),palette.secondary);
             display_painter.text(top+Vec2::new(0.,20.),egui::Align2::LEFT_TOP,format!("{} primitivas na tela",self.shown),FontId::proportional(10.),palette.secondary);
@@ -636,56 +644,6 @@ fn main() -> eframe::Result {
         options,
         Box::new(move |cc| Ok(Box::new(Desktop::new(cc, scene)))),
     )
-}
-
-impl Desktop {
-    fn measurement_window(&mut self, ctx: &egui::Context) {
-        let palette = self.palette();
-        let mut open = self.show_measurements;
-        let mut requested_pick = false;
-        egui::Window::new("Medições e referência de escala").open(&mut open).default_width(440.).default_pos([300.,90.]).show(ctx,|ui|{
-   egui::ScrollArea::vertical().id_salt("measurement_scroll").max_height((ctx.content_rect().height()-170.).max(240.)).show(ui,|ui|{
-   ui.label("Distância entre vértices no estado montado.");ui.label(RichText::new("A vista explodida não altera o valor medido.").size(11.).color(palette.secondary));
-   ui.horizontal(|ui|{if ui.button("Escolher pontos A e B").clicked(){self.anchors.clear();self.measure_mode=true;self.hover_anchor=None;requested_pick=true;self.notice(Ok(()),"Clique nos vértices da geometria: primeiro A, depois B.");}
-if ui.button("Cancelar seleção").clicked(){self.measure_mode=false;self.anchors.clear();}});
-   egui::CollapsingHeader::new("Seleção exata / coordenadas").show(ui,|ui|{
-    ui.label("Selecione uma peça na árvore e informe os índices dos vértices (começam em 1).");
-    ui.horizontal(|ui|{ui.label("A");ui.add(egui::DragValue::new(&mut self.exact_a).range(1..=1_000_000));ui.label("B");ui.add(egui::DragValue::new(&mut self.exact_b).range(1..=1_000_000));});
-    if ui.button("Usar estes vértices").clicked(){
-     if let Some(item)=self.scene.items.iter().find(|i|Some(&i.id)==self.scene.selected.as_ref()){
-      let a=Anchor{item_id:item.id.clone(),vertex:self.exact_a.saturating_sub(1)};let b=Anchor{item_id:item.id.clone(),vertex:self.exact_b.saturating_sub(1)};
-      match self.scene.raw_distance(&a,&b){Ok(_) if a!=b=>{self.anchors=vec![a,b];self.measure_mode=false;self.notice(Ok(()),"Vértices selecionados por índice original.");},_=>self.notice(Err("Índices ausentes ou iguais".into()),"")}
-     }else{self.notice(Err("Selecione uma peça, não uma montagem, na árvore.".into()),"");}
-    }
-    ui.label(RichText::new("Para melhorar o controle, use vistas ortográficas e o filtro de seleção em Visual.").size(10.).color(palette.secondary));
-   });
-   for (i,anchor) in self.anchors.iter().enumerate(){let name=self.scene.items.iter().find(|item|item.id==anchor.item_id).map(|i|i.name.as_str()).unwrap_or("Fonte ausente");ui.label(format!("{}: {} / vértice {}",if i==0{"A"}else{"B"},name,anchor.vertex+1));}
-   for (label,anchor) in ["A","B"].into_iter().zip(&self.anchors){if let Ok(p)=self.scene.anchor_position(anchor,false){ui.label(RichText::new(format!("{label} montado: [{:.*}, {:.*}, {:.*}] u. cena",self.scene.view.decimals,p[0],self.scene.view.decimals,p[1],self.scene.view.decimals,p[2])).size(10.).color(palette.secondary));}}
-   if self.anchors.len()==2{
-    let a=self.anchors[0].clone();let b=self.anchors[1].clone();
-    match self.scene.distance(&a,&b){Ok(d)=>{ui.heading(format!("{:.*} {}",self.scene.view.decimals,d.value,d.unit.map(|u|u.symbol()).unwrap_or("unidades da cena")));},Err(e)=>{ui.colored_label(palette.error,e.to_string());}}
-    if let (Ok(pa),Ok(pb))=(self.scene.anchor_position(&a,false),self.scene.anchor_position(&b,false)){
-     let (factor,unit)=self.scene.scale_factor().ok().flatten().map(|(f,u)|(f,u.symbol())).unwrap_or((1.,"u. cena"));let delta=std::array::from_fn::<_,3,_>(|i|(pb[i]-pa[i])*factor);
-     ui.label(format!("ΔX {:.*} · ΔY {:.*} · ΔZ {:.*} {}",self.scene.view.decimals,delta[0],self.scene.view.decimals,delta[1],self.scene.view.decimals,delta[2],unit));
-    }
-    ui.horizontal(|ui|{ui.label("Nome");ui.text_edit_singleline(&mut self.measure_name);});if ui.button("Registrar distância").clicked(){let result=self.scene.add_measurement(a.clone(),b.clone(),self.measure_name.clone());match result{Ok(_)=>{self.dirty=true;self.notice(Ok(()),"Medição registrada com incerteza desconhecida.");},Err(e)=>self.notice(Err(e),"")}}
-    ui.separator();ui.label(RichText::new("Definir escala por distância conhecida").strong());ui.horizontal(|ui|{ui.add(egui::DragValue::new(&mut self.known_distance).speed(0.1).range(1e-9..=1e12));egui::ComboBox::from_id_salt("length_unit").selected_text(self.length_unit.symbol()).show_ui(ui,|ui|{ui.selectable_value(&mut self.length_unit,LengthUnit::Millimetre,"mm");ui.selectable_value(&mut self.length_unit,LengthUnit::Metre,"m");});});ui.label("Origem / método da referência");ui.text_edit_singleline(&mut self.scale_provenance);
-    if ui.button("Aplicar referência de escala").clicked(){let result=self.scene.calibrate(a,b,self.known_distance,self.length_unit,self.scale_provenance.clone());if result.is_ok(){self.dirty=true;}self.notice(result,"Escala declarada. Geometria original preservada.");}
-   }
-   ui.separator();match self.scene.scale_factor(){Ok(Some((_,unit)))=>{ui.label(RichText::new(format!("Escala declarada em {}",unit.symbol())).color(palette.primary));},Ok(None)=>{ui.label("Escala física desconhecida; valores em unidades da cena.");},Err(e)=>{ui.colored_label(palette.warning,e.to_string());}}
-   if self.scene.calibration.is_some()&&ui.button("Remover referência de escala").clicked(){self.scene.calibration=None;self.dirty=true;}
-   ui.label(RichText::new("Incerteza desconhecida. Escala declarada não garante exatidão metrológica.").size(10.).color(palette.secondary));
-   let mut remove=None;egui::ScrollArea::vertical().max_height(180.).show(ui,|ui|{for m in &self.scene.measurements{ui.horizontal(|ui|{let text=match self.scene.distance(&m.a,&m.b){Ok(d)=>format!("{}: {:.*} {}",m.name,self.scene.view.decimals,d.value,d.unit.map(|u|u.symbol()).unwrap_or("u. cena")),Err(_)=>format!("{}: recalibrar",m.name)};ui.label(text);if ui.small_button("Remover").clicked(){remove=Some(m.id.clone());}});}});
-   if let Some(id)=remove{self.scene.measurements.retain(|m|m.id!=id);self.dirty=true;}
-   if ui.add_enabled(!self.scene.measurements.is_empty(),egui::Button::new("Exportar relatório de medições")).clicked(){self.choose(Purpose::ExportMeasurements);}
-   ui.label(RichText::new("Salvar revisão do workspace preserva medidas, âncoras e referência de escala.").size(10.).color(palette.secondary));
-   });
-  });
-        self.show_measurements = open && !requested_pick;
-        if !open {
-            self.measure_mode = false;
-        }
-    }
 }
 
 impl Desktop {
