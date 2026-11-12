@@ -61,3 +61,10 @@ deste incremento. E5 tem hierarquia manual/explosão e efeito de estilhaços vis
 alinhamento guiado e instâncias repetidas ainda pendentes. E6/E7/E8 não iniciadas.
 PRs Arctic/estilhaços integrados no ramo principal em 2026-11-11.
 Continuação E4: plano E4-ANGULOS-DIMENSOES.md, relatório ../quality/E4-INSPECAO-REPORT.md.
+
+## Ajustes visuais e E5 inicial — 2026-11-12
+Autorizados estilhaços menores/dispersão maior, retorno do arame e kit de pipeline.
+Alinhamento translacional por vértices, prévia e undo guardado implementados; sem
+rotação automática/ICP. Imagens sintéticas e malhas de teste incluídas no pacote.
+Pipeline esparso real revalidado pela CLI e GUI com 12/12 imagens; dense/CUDA segue
+pendente. Plano E5-ALINHAMENTO-KIT.md; relatório ../quality/E5-KIT-REPORT.md.

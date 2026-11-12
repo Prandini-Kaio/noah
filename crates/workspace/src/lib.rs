@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+pub mod alignment;
 pub mod assembly;
 pub mod camera;
 pub mod demo;

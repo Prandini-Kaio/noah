@@ -58,3 +58,10 @@ Workspace/inspection calcula ângulo ABC e AABB montada sem I/O ou UI. Sessão 5
 persiste definições e lê 1–4; relatório 2 inclui transformações/proveniência.
 Desktop/metrology reúne formulários, anotações e cache descartável de caixas,
 invalidado por geometria, transformações e hierarquia. Contrato: ADR 0009.
+
+## Alinhamento E5 inicial e kit
+Workspace/alignment planeja/aplica translação por duas âncoras com contexto guardado;
+UI mantém preview/undo temporários, sem alterar assets. Ajustes aplicados persistem
+nos Placements da sessão 5. Desktop usa exemplos locais empacotados; reconstrução
+continua via contrato COLMAP existente. Kit não atribui escala nem representa malha
+sintética como derivada da reconstrução. ADR 0010.

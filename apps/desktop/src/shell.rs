@@ -33,6 +33,12 @@ pub enum DisplayMode {
     Wire,
     Points,
 }
+impl DisplayMode {
+    pub fn mesh_style(self, legacy_wire: bool, overlay: bool) -> (bool, bool) {
+        let wire = legacy_wire || self == Self::Wire;
+        (!wire, wire || overlay)
+    }
+}
 impl Desktop {
     pub(super) fn header(&mut self, ctx: &egui::Context) {
         let p = self.palette();
@@ -62,6 +68,10 @@ impl Desktop {
                         }
                         if ui.button("Abrir projeto / run…").clicked() {
                             self.choose(Purpose::Project);
+                            ui.close();
+                        }
+                        if ui.button("Abrir peças de alinhamento do kit…").clicked() {
+                            self.open_alignment_kit();
                             ui.close();
                         }
                         if ui.button("Explorar montagem de exemplo…").clicked() {
@@ -322,16 +332,17 @@ impl Desktop {
        Module::Export=>{ui.heading("Exportação");ui.label("Exporta a peça no estado montado e preserva os dados originais.");let selected=self.scene.items.iter().any(|i|Some(&i.id)==self.scene.selected.as_ref());if ui.add_enabled(selected,egui::Button::new("Exportar peça montada…")).clicked(){self.choose(Purpose::Export);}
 if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::ExportMeasurements);}ui.separator();},_=>{}
       }
+      if self.module==Module::Assembly && ui.button("Alinhar peças…").clicked(){self.open_alignment();}
       egui::CollapsingHeader::new("Seleção e transformações").default_open(true).show(ui,|ui|{
        if self.blast.is_some(){ui.label("Prévia temporária ativa. Restaure para editar a seleção.");}else{self.selection_properties(ui);}
       });
       ui.add_space(12.);
       if matches!(self.module,Module::Assembly|Module::Inspection){egui::CollapsingHeader::new("Explosão e estilhaços").default_open(true).show(ui,|ui|self.blast_controls(ui));ui.add_space(12.);}
       egui::CollapsingHeader::new("Visualização").default_open(self.module==Module::Inspection).show(ui,|ui|{
-       ui.horizontal(|ui|{ui.selectable_value(&mut self.display_mode,DisplayMode::Solid,"Sólido");ui.selectable_value(&mut self.display_mode,DisplayMode::Wire,"Arame");ui.selectable_value(&mut self.display_mode,DisplayMode::Points,"Pontos");});
+       ui.horizontal(|ui|{for (mode,label) in [(DisplayMode::Solid,"Sólido"),(DisplayMode::Wire,"Arame"),(DisplayMode::Points,"Pontos")]{if ui.selectable_value(&mut self.display_mode,mode,label).changed(){self.scene.wireframe=mode==DisplayMode::Wire;self.dirty=true;}}});
        ui.checkbox(&mut self.show_mesh,"Exibir malhas");ui.checkbox(&mut self.show_clouds,"Exibir nuvens");
        if ui.checkbox(&mut self.scene.grid,"Grade de navegação").changed(){self.dirty=true;}
-       if ui.checkbox(&mut self.scene.wireframe,"Sobrepor arestas").changed(){self.dirty=true;}
+       ui.checkbox(&mut self.wire_overlay,"Sobrepor arestas ao sólido");
        if ui.add(egui::Slider::new(&mut self.scene.point_size,1.0..=8.0).text("Ponto / px")).changed(){self.dirty=true;}
        if ui.button("Tema, réguas e opções…").clicked(){self.show_visual=true;}
        ui.label(RichText::new("Exibição amostrada; profundidade aproximada.").size(10.).color(p.secondary));
@@ -441,11 +452,25 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
         }
     }
     fn start_blast(&mut self) {
+        self.alignment.preview = false;
+        self.alignment.open = false;
         self.stop_transition();
         self.measure_mode = false;
         self.hover_anchor = None;
-        match blast::Blast::new(&self.scene, self.blast_selected, self.blast_strength) {
+        match if self.blast_detail == 3 {
+            blast::Blast::new(&self.scene, self.blast_selected, self.blast_strength)
+        } else {
+            blast::Blast::with_detail(
+                &self.scene,
+                self.blast_selected,
+                self.blast_strength,
+                self.blast_detail,
+            )
+        } {
             Ok(mut b) => {
+                if self.blast_follow {
+                    b.follow_camera(&self.scene.camera);
+                }
                 if self.scene.view.reduced_motion {
                     b.progress = 1.;
                     b.playing = false;
@@ -475,12 +500,35 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
         });
         if self.blast_mode {
             ui.checkbox(&mut self.blast_selected, "Somente seleção");
+            egui::ComboBox::from_id_salt("shard_size")
+                .selected_text(match self.blast_detail {
+                    2 => "Pedaços médios",
+                    4 => "Pedaços muito pequenos",
+                    _ => "Pedaços pequenos",
+                })
+                .show_ui(ui, |ui| {
+                    for (n, label) in [(2, "Médios"), (3, "Pequenos"), (4, "Muito pequenos")] {
+                        ui.selectable_value(&mut self.blast_detail, n, label);
+                    }
+                });
+            ui.label(
+                RichText::new(
+                    "O tamanho é aplicado ao clicar Explodir; ajusta-se ao limite de exibição.",
+                )
+                .size(10.)
+                .color(self.palette().secondary),
+            );
+            ui.checkbox(&mut self.blast_follow, "Câmera acompanha a explosão");
             if ui
-                .add(egui::Slider::new(&mut self.blast_strength, 0.2..=3.0).text("Força"))
+                .add(egui::Slider::new(&mut self.blast_strength, 0.2..=6.0).text("Força"))
                 .changed()
                 && let Some(b) = &mut self.blast
             {
                 b.strength = self.blast_strength;
+                if let Some((from, _)) = &b.frame {
+                    let from = from.clone();
+                    b.follow_camera(&from);
+                }
             }
             ui.horizontal(|ui| {
                 if ui
@@ -800,5 +848,17 @@ mod tests {
         );
         assert!(matching_ids(&s, "inexistente").is_empty());
         assert_eq!(matching_ids(&s, "").len(), 3);
+    }
+}
+
+#[cfg(test)]
+mod wire_tests {
+    use super::*;
+    #[test]
+    fn legacy_wire_removes_faces_overlay_keeps_faces() {
+        assert_eq!(DisplayMode::Solid.mesh_style(true, false), (false, true));
+        assert_eq!(DisplayMode::Wire.mesh_style(false, false), (false, true));
+        assert_eq!(DisplayMode::Solid.mesh_style(false, true), (true, true));
+        assert_eq!(DisplayMode::Solid.mesh_style(false, false), (true, false));
     }
 }

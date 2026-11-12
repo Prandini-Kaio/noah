@@ -6,6 +6,7 @@ use std::{
     sync::mpsc::{self, Receiver},
     time::Duration,
 };
+mod alignment;
 mod animation;
 mod blast;
 mod browser;
@@ -21,9 +22,11 @@ enum Replace {
     New,
     Session(PathBuf),
     Demo(PathBuf),
+    AlignmentKit([PathBuf; 2]),
 }
 struct Desktop {
     scene: Scene,
+    alignment: alignment::AlignmentUi,
     message: String,
     error: bool,
     dirty: bool,
@@ -61,6 +64,9 @@ struct Desktop {
     blast_mode: bool,
     blast_selected: bool,
     blast_strength: f64,
+    blast_detail: u32,
+    blast_follow: bool,
+    wire_overlay: bool,
     module: shell::Module,
     tool: shell::Tool,
     left_visible: bool,
@@ -76,8 +82,14 @@ struct Desktop {
 impl Desktop {
     fn new(cc: &eframe::CreationContext<'_>, scene: Scene) -> Self {
         theme::apply(&cc.egui_ctx, scene.view.theme);
+        let display_mode = if scene.wireframe {
+            shell::DisplayMode::Wire
+        } else {
+            shell::DisplayMode::Solid
+        };
         Self {
             scene,
+            alignment: Default::default(),
             message: "Pronto · importe geometria ou explore seu workspace local.".into(),
             error: false,
             dirty: false,
@@ -114,7 +126,10 @@ impl Desktop {
             blast: None,
             blast_mode: true,
             blast_selected: false,
-            blast_strength: 1.,
+            blast_strength: 1.4,
+            blast_detail: 3,
+            blast_follow: true,
+            wire_overlay: false,
             module: shell::Module::Assembly,
             tool: shell::Tool::Orbit,
             left_visible: true,
@@ -123,7 +138,7 @@ impl Desktop {
             tree_search: String::new(),
             tree_matches: Default::default(),
             analysis_tab: false,
-            display_mode: shell::DisplayMode::Solid,
+            display_mode,
             show_mesh: true,
             show_clouds: true,
         }
@@ -168,6 +183,9 @@ impl Desktop {
     fn replace_scene(&mut self, action: Replace) {
         if matches!(action, Replace::New) {
             self.blast = None;
+            self.alignment = Default::default();
+            self.display_mode = shell::DisplayMode::Solid;
+            self.wire_overlay = false;
             self.scene = Scene::default();
             self.anchors.clear();
             self.measure_mode = false;
@@ -182,6 +200,14 @@ impl Desktop {
             let result = match action {
                 Replace::Session(p) => session::load(&p),
                 Replace::Demo(p) => noah_workspace::demo::create(&p),
+                Replace::AlignmentKit(paths) => (|| {
+                    let mut scene = Scene::default();
+                    for path in paths {
+                        scene.add_source(&path)?;
+                    }
+                    scene.selected = scene.items.last().map(|i| i.id.clone());
+                    Ok(scene)
+                })(),
                 Replace::New => Ok(Scene::default()),
             };
             let _ = tx.send(result);
@@ -293,8 +319,11 @@ impl Desktop {
             if response.dragged() && self.pending.is_none(){self.stop_transition();let delta=ctx.input(|i|i.pointer.delta());let pan=self.tool==shell::Tool::Pan||response.dragged_by(egui::PointerButton::Secondary)||response.dragged_by(egui::PointerButton::Middle)||ctx.input(|i|i.modifiers.shift);if pan{self.scene.camera.pan([delta.x as f64,delta.y as f64],size[1]);}else if self.tool==shell::Tool::Orbit{self.scene.camera.orbit([delta.x as f64,delta.y as f64]);}self.dirty=true;}
             if response.hovered() && self.pending.is_none(){let scroll=ctx.input(|i|i.smooth_scroll_delta.y);if scroll!=0.{self.stop_transition();self.scene.camera.zoom(scroll as f64);self.dirty=true;}}
             if !ctx.wants_keyboard_input()&&ctx.input(|i|i.key_pressed(egui::Key::F)){self.fit_view();}
+            let aligning=self.alignment.preview && self.alignment.plan.as_ref().is_some_and(|p|p.is_current(&self.scene));
             let mut display_scene=self.scene.clone();
+            if aligning && let Some(plan)=&self.alignment.plan && let Some(item)=display_scene.items.iter_mut().find(|i|i.id==plan.source().item_id){item.placement=plan.placement().clone();display_scene.explosion=0.;}
             if let Some(t)=&self.transition{display_scene.explosion=t.value();display_scene.camera=t.camera();}
+            if let Some(b)=&self.blast&&let Some(c)=b.camera(){display_scene.camera=c;}
             let display_painter=painter.with_clip_rect(rect);
             let to_screen=|p:[f64;2]|Pos2::new(rect.left()+p[0] as f32,rect.top()+p[1] as f32);
             if self.scene.grid&&display_scene.camera.projection==Projection::Orthographic{viewport_tools::ortho_grid(&display_painter,&display_scene,rect,palette);}
@@ -312,7 +341,8 @@ impl Desktop {
             primitives.sort_by(|a,b|b.depth.total_cmp(&a.depth));self.shown=primitives.len();
             if response.clicked() && self.pending.is_none()&& let Some(pos)=response.interact_pointer_pos() && rect.contains(pos){
                 let point=[(pos.x-rect.left()) as f64,(pos.y-rect.top()) as f64];
-                if self.blast.is_some(){self.notice(Err("Restaure o objeto antes de selecionar ou medir; os estilhaços são apenas visuais".into()),"");}
+                if aligning{self.notice(Err("Encerre a prévia de alinhamento para selecionar ou medir".into()),"");}
+                else if self.blast.is_some(){self.notice(Err("Restaure o objeto antes de selecionar ou medir; os estilhaços são apenas visuais".into()),"");}
                 else if self.measure_mode && self.transition.is_some(){self.notice(Err("Aguarde o fim da animação para selecionar vértices".into()),"");}
                 else if self.measure_mode{
                     if let Some(anchor)=measurement::pick_anchor_controlled(&display_scene,point,size){
@@ -321,6 +351,7 @@ impl Desktop {
                     }else{let faces:usize=self.scene.items.iter().filter(|i|i.visible).map(|i|match i.geometry.as_ref(){Geometry::Mesh(m)=>m.triangles().len(),_=>0}).sum();let text=if self.scene.view.occlusion&&faces>200_000{"Proteção frontal limitada a 200 mil faces visíveis. Isole peças ou desative essa opção em Visual."}else if self.scene.view.selected_only&&self.scene.selected.is_none(){"Selecione uma peça/montagem ou desative o filtro em Visual."}else{"Nenhum vértice próximo. Aproxime a câmera e tente novamente."};self.notice(Err(text.into()),"");}
                 }else{self.scene.selected=noah_workspace::pick(&primitives,point,7.).map(|i|self.scene.items[i].id.clone());self.dirty=true;}
             }
+            let (fill_faces,draw_edges)=self.display_mode.mesh_style(self.scene.wireframe,self.wire_overlay);
             let mut mesh=egui::Mesh::default();let mut edges=Vec::new();
             for primitive in &primitives{
                 if primitive.pixels.iter().flatten().any(|v|v.abs()>1e7){continue;}
@@ -328,15 +359,15 @@ impl Desktop {
                 let original=primitive.color;let color=if selected{Color32::from_rgb(((original[0] as u16+palette.primary.r() as u16)/2) as u8,((original[1] as u16+palette.primary.g() as u16)/2) as u8,((original[2] as u16+palette.primary.b() as u16)/2) as u8)}else{Color32::from_rgb(original[0],original[1],original[2])};
                 if primitive.pixels.len()==1{let pos=to_screen(primitive.pixels[0]);mesh.add_colored_rect(Rect::from_center_size(pos,Vec2::splat(self.scene.point_size)),color);}else{
                     let points:Vec<_>=primitive.pixels.iter().map(|&p|to_screen(p)).collect();
-                    if self.display_mode!=shell::DisplayMode::Wire{let start=mesh.vertices.len() as u32;for &p in &points{mesh.colored_vertex(p,color);}mesh.indices.extend([start,start+1,start+2]);}
+                    if fill_faces{let start=mesh.vertices.len() as u32;for &p in &points{mesh.colored_vertex(p,color);}mesh.indices.extend([start,start+1,start+2]);}
                     let line=if selected{palette.primary}else{palette.border};
-                    if display_scene.wireframe {for i in 0..3{edges.push(egui::Shape::line_segment([points[i],points[(i+1)%3]],Stroke::new(1.0_f32,line)));}}
+                    if draw_edges {for i in 0..3{edges.push(egui::Shape::line_segment([points[i],points[(i+1)%3]],Stroke::new(1.0_f32,line)));}}
                 }
             }
             display_painter.add(egui::Shape::mesh(mesh));display_painter.extend(edges);
             let visual_transforms=display_scene.world_transforms(true).ok();
             let anchor_screen=|a:&Anchor|self.scene.items.iter().position(|i|i.id==a.item_id).filter(|&index|self.scene.items[index].visible).and_then(|index|self.scene.items[index].geometry.positions().get(a.vertex).and_then(|&p|visual_transforms.as_ref().and_then(|ts|ts[index].apply(p).ok()))).and_then(|p|display_scene.camera.project(p,size)).map(|p|to_screen([p[0],p[1]]));
-            for measure in self.scene.measurements.iter().filter(|_|self.scene.view.annotations && self.blast.is_none()){
+            for measure in self.scene.measurements.iter().filter(|_|self.scene.view.annotations && self.blast.is_none() && !aligning){
                 if let (Some(a),Some(b))=(anchor_screen(&measure.a),anchor_screen(&measure.b)){
                     display_painter.line_segment([a,b],Stroke::new(1.5_f32,palette.primary));display_painter.circle_filled(a,3.5,palette.primary);display_painter.circle_filled(b,3.5,palette.primary);
                     let label=match self.scene.distance(&measure.a,&measure.b){Ok(d)=>format!("{}: {:.*} {} (montado)",measure.name,self.scene.view.decimals,d.value,d.unit.map(|u|u.symbol()).unwrap_or("u. cena")),Err(_)=>format!("{}: recalibrar escala",measure.name)};
@@ -352,7 +383,8 @@ impl Desktop {
                     if let Some(a)=&self.hover_anchor&&let Some(p)=anchor_screen(a){display_painter.circle_stroke(p,9.,Stroke::new(1.5_f32,palette.primary));display_painter.line_segment([p-Vec2::new(13.,0.),p+Vec2::new(13.,0.)],Stroke::new(1.0_f32,palette.primary));display_painter.text(p+Vec2::new(15.,-15.),egui::Align2::LEFT_BOTTOM,format!("Vértice {}",a.vertex+1),FontId::proportional(11.),palette.primary);}
                 }else{self.hover_anchor=None;self.hover_pixel=None;}
             }
-            if self.scene.view.annotations && self.blast.is_none(){self.draw_inspection(&display_scene,&display_painter,rect);}
+            if self.scene.view.annotations && self.blast.is_none() && !aligning{self.draw_inspection(&display_scene,&display_painter,rect);}
+            if aligning{display_painter.text(rect.center_top()+Vec2::new(0.,60.),egui::Align2::CENTER_TOP,"PRÉVIA DE ALINHAMENTO · aplique ou cancele na janela",FontId::proportional(13.),palette.warning);}
             viewport_tools::draw(&painter,&display_scene,outer,rect,palette,response.hover_pos());
             let top=rect.left_top()+Vec2::new(22.,22.);display_painter.text(top,egui::Align2::LEFT_TOP,if display_scene.camera.projection==Projection::Orthographic{"ORTOGRÁFICA · U/V"}else{"PERSPECTIVA"},FontId::proportional(11.),palette.secondary);
             display_painter.text(top+Vec2::new(0.,20.),egui::Align2::LEFT_TOP,format!("{} primitivas na tela",self.shown),FontId::proportional(10.),palette.secondary);
@@ -373,6 +405,10 @@ impl Desktop {
         egui::Window::new("Fotogrametria local").open(&mut open).default_width(660.).collapsible(false).show(ctx,|ui|{
    ui.label(RichText::new("Fotografias / Câmeras / Nuvem de pontos").size(18.).strong());ui.label("Escolha um COLMAP 3.11.x instalado localmente. Seus dados permanecem nesta máquina.");ui.separator();
    let busy=self.reconstruction.worker.is_some();
+   ui.add_enabled_ui(!busy,|ui|{ui.horizontal(|ui|{
+    if ui.button("Usar fotos do kit incluído").clicked(){if let Some(path)=kit_path("pipeline/fotos"){self.reconstruction.images=path;self.reconstruction.name="reconstrucao-kit-001".into();for i in 1..=1000{let name=format!("reconstrucao-kit-{i:03}");if !self.reconstruction.parent.join(&name).exists(){self.reconstruction.name=name;break;}}self.notice(Ok(()),"12 imagens sintéticas selecionadas; configure o COLMAP local e o destino.");}else{self.notice(Err("Kit de fotos não encontrado ao lado do aplicativo".into()),"");}}
+    if ui.button("Abrir nuvem pronta").on_hover_text("Abre um resultado pré-processado; não executa reconstrução").clicked()&&let Some(path)=kit_path("pipeline/sparse-preprocessado.ply"){self.load_source(path);}
+   });});
    ui.add_enabled_ui(!busy,|ui|{
     ui.horizontal(|ui|{if ui.button("1. Escolher fotografias").clicked(){self.choose(Purpose::Images);}ui.label(self.reconstruction.images.display().to_string());});
     ui.horizontal(|ui|{if ui.button("2. Escolher COLMAP").clicked(){self.choose(Purpose::Engine);}ui.label(self.reconstruction.engine.display().to_string());});
@@ -428,6 +464,12 @@ impl eframe::App for Desktop {
                     match result {
                         Ok(scene) => {
                             self.blast = None;
+                            self.display_mode = if scene.wireframe {
+                                shell::DisplayMode::Wire
+                            } else {
+                                shell::DisplayMode::Solid
+                            };
+                            self.alignment = Default::default();
                             self.scene = scene;
                             ctx.request_repaint();
                             self.transition = None;
@@ -519,8 +561,12 @@ impl eframe::App for Desktop {
             ctx.request_repaint_after(Duration::from_millis(16));
         }
         if self.show_measurements {
+            self.alignment.preview = false;
             self.restore_blast();
             self.measurement_window(ctx);
+        }
+        if self.alignment.open {
+            self.alignment_window(ctx);
         }
         if self.show_visual {
             self.visual_window(ctx);
@@ -651,6 +697,12 @@ impl Desktop {
         theme::Palette::new(self.scene.view.theme)
     }
     fn stop_transition(&mut self) {
+        if let Some(b) = &mut self.blast
+            && let Some(c) = b.camera()
+        {
+            self.scene.camera = c;
+            b.frame = None;
+        }
         self.hover_anchor = None;
         self.hover_pixel = None;
         if let Some(t) = self.transition.take() {
@@ -659,6 +711,7 @@ impl Desktop {
         }
     }
     fn animate_explosion(&mut self, target: f64) {
+        self.alignment.preview = false;
         self.blast = None;
         self.stop_transition();
         let from = self.scene.explosion;
@@ -729,6 +782,7 @@ impl Desktop {
     }
     fn visual_window(&mut self, ctx: &egui::Context) {
         let palette = self.palette();
+        let was_wire = self.scene.wireframe;
         let mut open = self.show_visual;
         egui::Window::new("Visualização · Arctic").open(&mut open).default_width(390.).show(ctx,|ui|{
    ui.label(RichText::new("APARÊNCIA").size(11.).color(palette.secondary));
@@ -740,13 +794,32 @@ if ui.selectable_value(&mut self.scene.camera.projection,Projection::Orthographi
    ui.horizontal(|ui|{for name in ["Frontal","Superior","Lateral"]{if ui.button(name).clicked(){self.preset(name);}}});
    ui.label(RichText::new("Ortográfica: escala uniforme. Perspectiva: régua referida ao plano do alvo, não a todas as profundidades.").size(11.).color(palette.secondary));
    ui.separator();
-   for (value,label) in [(&mut self.scene.view.rulers,"Réguas e escala"),(&mut self.scene.view.axes,"Eixos de orientação"),(&mut self.scene.view.annotations,"Anotações de medida"),(&mut self.scene.grid,"Grade de navegação"),(&mut self.scene.wireframe,"Arame / arestas"),(&mut self.scene.view.reduced_motion,"Reduzir movimentos")]{if ui.checkbox(value,label).changed(){self.dirty=true;}}
+   for (value,label) in [(&mut self.scene.view.rulers,"Réguas e escala"),(&mut self.scene.view.axes,"Eixos de orientação"),(&mut self.scene.view.annotations,"Anotações de medida"),(&mut self.scene.grid,"Grade de navegação"),(&mut self.scene.wireframe,"Malha em arame (sem sólido)"),(&mut self.scene.view.reduced_motion,"Reduzir movimentos")]{if ui.checkbox(value,label).changed(){self.dirty=true;}}
    ui.label("E4 · SELEÇÃO DE VÉRTICES");if ui.add(egui::Slider::new(&mut self.scene.view.snap_radius,3.0..=24.0).text("Raio / px")).changed(){self.dirty=true;}
    if ui.checkbox(&mut self.scene.view.selected_only,"Somente peça/montagem selecionada").changed(){self.dirty=true;}
    if ui.checkbox(&mut self.scene.view.occlusion,"Evitar vértices atrás de faces").changed(){self.dirty=true;}
    if ui.add(egui::Slider::new(&mut self.scene.view.decimals,0..=9).text("Casas decimais")).changed(){self.dirty=true;}
    ui.label(RichText::new("Casas decimais alteram a exibição, não a exatidão física. Preferências acompanham o workspace.").size(10.).color(palette.secondary));
   });
+        if self.scene.wireframe != was_wire {
+            self.display_mode = if self.scene.wireframe {
+                shell::DisplayMode::Wire
+            } else {
+                shell::DisplayMode::Solid
+            };
+        }
         self.show_visual = open;
     }
+}
+
+fn kit_path(relative: &str) -> Option<PathBuf> {
+    let packaged = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.join("examples").join(relative)));
+    packaged.filter(|p| p.exists()).or_else(|| {
+        let p = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples")
+            .join(relative);
+        p.exists().then_some(p)
+    })
 }

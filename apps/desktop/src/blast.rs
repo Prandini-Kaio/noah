@@ -22,6 +22,7 @@ pub struct Blast {
     pub reverse: bool,
     pub strength: f64,
     radius: f64,
+    pub frame: Option<(Camera, Camera)>,
 }
 fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [
@@ -54,6 +55,17 @@ fn split(t: [[f64; 3]; 3]) -> [[[f64; 3]; 3]; 4] {
 }
 impl Blast {
     pub fn new(scene: &Scene, selected_only: bool, strength: f64) -> noah_workspace::Result<Self> {
+        Self::with_detail(scene, selected_only, strength, 3)
+    }
+    pub fn with_detail(
+        scene: &Scene,
+        selected_only: bool,
+        strength: f64,
+        detail: u32,
+    ) -> noah_workspace::Result<Self> {
+        if !strength.is_finite() || !(0.2..=6.).contains(&strength) || detail > 4 {
+            return Err("força/detalhe de explosão inválidos".into());
+        }
         let transforms = scene.world_transforms(true)?;
         let targets: Vec<_> = scene
             .items
@@ -80,7 +92,23 @@ impl Blast {
                 Geometry::Points(p) => p.positions().len(),
             })
             .sum();
-        let stride = faces.div_ceil(LIMIT / 4).max(1);
+        let stride = faces.div_ceil(LIMIT).max(1);
+        let mesh_faces: usize = targets
+            .iter()
+            .map(|&i| match scene.items[i].geometry.as_ref() {
+                Geometry::Mesh(m) => m.triangles().len(),
+                _ => 0,
+            })
+            .sum();
+        let cloud_points = faces - mesh_faces;
+        let mut level = detail;
+        while level > 0
+            && mesh_faces.div_ceil(stride) * 4usize.pow(level) + cloud_points.div_ceil(stride)
+                > LIMIT
+        {
+            level -= 1;
+        }
+
         let mut raw = Vec::new();
         let mut serial = 0;
         let palette = [
@@ -103,7 +131,11 @@ impl Blast {
                         for k in 0..3 {
                             t[k] = transforms[i].apply(m.positions()[face[k] as usize])?;
                         }
-                        for tri in split(t) {
+                        let mut fragments = vec![t];
+                        for _ in 0..level {
+                            fragments = fragments.into_iter().flat_map(split).collect();
+                        }
+                        for tri in fragments {
                             raw.push((i, tri.to_vec(), palette[i % 5]));
                         }
                     }
@@ -150,7 +182,7 @@ impl Blast {
                 let radial = mul(sub(center, origin), 1. / radius);
                 let velocity = mul(
                     unit(add(radial, mul(jitter, 0.8))),
-                    radius * (0.7 + 0.8 * noise(seed, 4).abs()),
+                    radius * (2.0 + 2.0 * noise(seed, 4).abs()),
                 );
                 Shard {
                     item,
@@ -169,8 +201,29 @@ impl Blast {
             progress: 0.,
             playing: true,
             reverse: false,
-            strength: strength.clamp(0.2, 3.),
+            strength,
+            frame: None,
             radius,
+        })
+    }
+    pub fn follow_camera(&mut self, camera: &Camera) {
+        let old = self.progress;
+        self.progress = 1.;
+        let mut to = camera.clone();
+        let ok = self.fit_camera(&mut to).is_ok();
+        self.progress = old;
+        if ok {
+            self.frame = Some((camera.clone(), to));
+        }
+    }
+    pub fn camera(&self) -> Option<Camera> {
+        self.frame.as_ref().map(|(from, to)| {
+            let t = self.progress * self.progress * (3. - 2. * self.progress);
+            let mut c = from.clone();
+            c.target =
+                std::array::from_fn(|i| from.target[i] + (to.target[i] - from.target[i]) * t);
+            c.distance = from.distance + (to.distance - from.distance) * t;
+            c
         })
     }
     pub fn fit_camera(&self, camera: &mut Camera) -> noah_workspace::Result<()> {
@@ -284,7 +337,7 @@ mod tests {
         let Geometry::Mesh(m) = s.items[0].geometry.as_ref() else {
             panic!()
         };
-        assert_eq!(b.count(), m.triangles().len() * 4);
+        assert_eq!(b.count(), m.triangles().len() * 64);
         let area = |t: &[[f64; 3]]| {
             let n = cross(sub(t[1], t[0]), sub(t[2], t[0]));
             dot(n, n).sqrt() * 0.5
@@ -394,5 +447,36 @@ mod tests {
         b.fit_camera(&mut c).unwrap();
         c.validate().unwrap();
         assert!(!b.project(&c, [800., 600.]).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod detail_tests {
+    use super::*;
+    #[test]
+    fn small_shards_cover_surface_and_travel_further_with_bounded_detail() {
+        let mut s = Scene::default();
+        s.add_source(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/datasets/inspection-box.obj"),
+        )
+        .unwrap();
+        let coarse = Blast::with_detail(&s, false, 1., 2).unwrap();
+        let mut fine = Blast::with_detail(&s, false, 1., 3).unwrap();
+        assert_eq!(fine.count(), 768);
+        assert_eq!(fine.count(), coarse.count() * 4);
+        fine.progress = 1.;
+        for shard in &fine.shards {
+            let v = fine.vertices(shard);
+            let centroid = mul(v.iter().copied().fold([0.; 3], add), 1. / v.len() as f64);
+            assert!(
+                dot(sub(centroid, shard.center), sub(centroid, shard.center)).sqrt()
+                    > fine.radius * 1.5
+            );
+        }
+        fine.follow_camera(&s.camera);
+        assert!(fine.camera().unwrap().distance > s.camera.distance);
+        assert!(Blast::with_detail(&s, false, f64::NAN, 3).is_err());
+        assert!(Blast::with_detail(&s, false, 1., 5).is_err());
     }
 }

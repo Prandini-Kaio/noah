@@ -11,3 +11,10 @@ Para calibrar, em Distância use A=2 e B=1; declare distância conhecida 200 mm.
 Dimensões XYZ deve exibir 200 x 300 x 400 mm. Esses números são referências
 sintéticas declaradas; não constituem validação metrológica de captura real.
 Registrar grava a definição da medida; Salvar cria uma nova sessão.
+
+PIPELINE REAL E MONTAGEM
+pipeline/fotos contém 12 PNGs sintéticos CC0 já prontos; pipeline/README.md explica
+COLMAP 3.11.x, destino novo e execução esparsa pela interface. A nuvem ao lado é
+explicitamente pré-processada. Malhas em alinhamento/ são exemplos independentes,
+não derivados dessas fotos. Veja alinhamento/README.md para translação -4 em X.
+Não confunda a escala declarada da caixa E4 com a escala arbitrária da nuvem SfM.

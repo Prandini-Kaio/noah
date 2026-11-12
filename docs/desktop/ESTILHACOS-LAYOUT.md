@@ -42,7 +42,7 @@ restaura o objeto. Salvar e exportar continuam usando o estado original montado
 
 ## Contrato e limites
 Efeito somente de apresentação, sem nova representação de domínio. Cada face
-triangular amostrada é subdividida em quatro triângulos coplanares, com cobertura
+triangular é subdividida recursivamente em triângulos coplanares, com cobertura
 exata da face no tempo zero. Não existem faces de corte, interior volumétrico,
 colisões, fratura física ou edição topológica. São estilhaços de superfície.
 Nuvens dispersam pontos e preservam suas cores; nenhuma superfície é inferida.
@@ -65,3 +65,9 @@ que prometam esses recursos futuros.
 
 Atualização E4: ângulos e dimensões disponíveis na prévia v0.6; sessões novas
 são versão 5. Consulte [Inspeção E4](E4-INSPECAO.md) para o comportamento atual.
+
+Atualização v0.7: detalhe padrão 64 triângulos por face em malhas pequenas
+(768 numa caixa de 12 faces), ajustado ao orçamento de 20 mil fragmentos. Malhas
+maiores reduzem a subdivisão antes de amostrar faces. Força padrão 1,4 com impulso
+maior; câmera acompanha opcionalmente e navegação manual interrompe o acompanhamento.
+Arame sem preenchimento foi restaurado; Sobrepor arestas é opção separada.
