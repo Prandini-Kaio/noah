@@ -60,3 +60,7 @@ continuação não declara E4 completa nem muda a pendência dense/CUDA da E2.
 O pacote Linux inclui examples/inspection-box.obj e instruções CC0. Abra-o em
 Importar → Geometria. A=6, B=5, C=8 dá 90°. Calibre a distância 2–1 como 200 mm:
 Dimensões XYZ dá X=200, Y=300, Z=400 mm. Registre, salve e reabra a sessão.
+
+Atualização v0.7: alinhamento translacional por um par de vértices já disponível
+na Montagem. Consulte [Kit E5](E5-KIT-PIPELINE.md); rotação automática/ICP continuam
+fora desse alinhamento inicial.

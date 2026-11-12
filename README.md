@@ -11,9 +11,9 @@ fotogrametria e explorar resultados em um workspace desktop.
 | E2 — Fotogrametria | COLMAP 3.11.x esparso validado com 12 imagens sintéticas; densificação real pendente de CUDA |
 | E3 — Workspace desktop | Fluxos principais pela interface, reconstrução acompanhada e sessões verificadas |
 | E4 — Medições iniciais | Distâncias, ângulos ABC, dimensões XYZ, escala, anotações e relatórios; sem validação metrológica |
-| Recorte E5 — Montagens | Hierarquia manual, exemplo de dez peças e vista explodida reversível |
+| Recorte E5 — Montagens | Hierarquia, alinhamento translacional por vértices, exemplo e explosão reversível |
 
-Snapshot de desenvolvimento: 54 testes passaram em Linux x86_64. O resultado
+Snapshot de desenvolvimento: 60 testes passaram em Linux x86_64. O resultado
 esparso incluído contém 7.592 pontos. Não são prometidas precisão metrológica,
 compatibilidade universal de formatos ou execução gráfica em todos os sistemas.
 
@@ -25,6 +25,26 @@ cd noah
 ```
 
 Também é possível baixar em **Code → Download ZIP**.
+
+## Kit de pipeline e alinhamento E5
+
+O pacote inclui **12 imagens sintéticas**, uma nuvem histórica pré-processada e
+duas malhas para alinhamento. Em Reconstrução, **Usar fotos do kit incluído**
+seleciona os dados; indique seu COLMAP 3.11.x e um destino novo. O fluxo esparso
+real foi novamente validado pela CLI e interface com 12/12 imagens registradas.
+Sem COLMAP, **Abrir nuvem pronta** permite testar a inspeção sem reconstruir.
+
+Em Workspace → Abrir peças de alinhamento do kit → Montagem → Alinhar peças,
+use movel.obj/1 → fixa.obj/2: ΔX=-4 u. cena. Prévia não modifica o conjunto;
+Aplicar ajusta a instância; Desfazer é protegido contra alterações posteriores.
+É alinhamento translacional, sem rotação automática/ICP ou restrições CAD.
+
+Estilhaços agora são menores (768 por caixa simples no detalhe padrão), com maior
+dispersão e acompanhamento de câmera. Arame voltou a ser **sem preenchimento**;
+sobrepor arestas ao sólido é uma opção independente.
+[Guia do kit e limites](docs/desktop/E5-KIT-PIPELINE.md).
+
+![Alinhamento E5](docs/desktop/e5-alinhamento.png)
 
 ## Inspeção E4: ângulos e dimensões
 
@@ -133,7 +153,8 @@ com hardware real nesta entrega. Não há download de dados nem telemetria do NO
 - [Pacote e instruções](LEIA-ME-PACOTE.md)
 - [Relatório E1](docs/quality/E1-REPORT.md)
 - [Relatório E2](docs/quality/E2-REPORT.md)
-- [E4: ângulos e dimensões — relatório atual](docs/quality/E4-INSPECAO-REPORT.md)
+- [Ajustes/E5/kit de pipeline — relatório atual](docs/quality/E5-KIT-REPORT.md)
+- [E4: ângulos e dimensões — relatório](docs/quality/E4-INSPECAO-REPORT.md)
 - [Estilhaços e layout — relatório](docs/quality/ESTILHACOS-REPORT.md)
 - [Arctic — relatório](docs/quality/ARCTIC-REPORT.md)
 - [Medições e escala — relatório](docs/quality/E4-REPORT.md)

@@ -68,6 +68,19 @@ e sua validação real continua pendente. O app não baixa motores nem fotografi
 LIMITES E LICENÇAS
 Renderer amostrado (50 mil pontos / 20 mil faces), profundidade aproximada,
 sem z-buffer 3D ou CAD. Dimensões usam todos os vértices, sem essa amostragem.
-Área, volume, novas primitivas e alinhamento guiado ainda não disponíveis.
+Área, volume, novas primitivas e alinhamento por rotação/ICP ainda não disponíveis.
 Código MIT; exemplos CC0-1.0. Licenças de dependências em third-party-licenses.
 Código e relatórios: https://github.com/Prandini-Kaio/noah
+
+KIT DE PIPELINE E ALINHAMENTO (v0.7)
+Reconstrução > Usar fotos do kit incluído seleciona 12 imagens sintéticas.
+Configure COLMAP 3.11.x local e destino novo; deixe dense desmarcado para CPU.
+Ao concluir, abra a nuvem, registre medidas, salve/reabra e exporte PLY/relatório.
+Abrir nuvem pronta é apenas inspeção de resultado histórico, sem reconstrução.
+Workspace > Abrir peças de alinhamento do kit fornece malhas sintéticas separadas.
+Montagem > Alinhar peças: movel.obj/1 até fixa.obj/2 dá ΔX=-4 u. cena.
+Há prévia, aplicar e desfazer guardado. É somente translação, sem rotação/ICP.
+Arame volta a mostrar arestas sem preenchimento; Sobrepor arestas é separado.
+Estilhaços padrão são menores e se espalham mais; escolha tamanho, força e
+acompanhamento de câmera antes de Explodir. Não alteram fontes nem medidas.
+Guia: examples/pipeline/README.md e examples/alinhamento/README.md.
