@@ -52,3 +52,9 @@ Desktop `blast` mantém apenas um cache visual de fragmentos. Não grava malhas,
 objetos ou medidas; usa transforms e primitives do workspace, sem dependência
 inversa. `shell` organiza navegação e contexto; domínio/sessão schema 4 não mudam.
 Fratura volumétrica/colisões não fazem parte deste efeito. Contrato: ADR 0008.
+
+## Continuação E4: ângulos e dimensões
+Workspace/inspection calcula ângulo ABC e AABB montada sem I/O ou UI. Sessão 5
+persiste definições e lê 1–4; relatório 2 inclui transformações/proveniência.
+Desktop/metrology reúne formulários, anotações e cache descartável de caixas,
+invalidado por geometria, transformações e hierarquia. Contrato: ADR 0009.

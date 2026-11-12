@@ -61,3 +61,6 @@ adequadas ao uso; não há garantia de tolerância industrial.
 
 Sessão 4 lê 1/2/3. Apps anteriores não abrem as novas sessões; mantenha revisões
 antigas se precisar voltar de versão. Fotos/PLY/OBJ originais permanecem intactos.
+
+Atualização E4: ângulos e dimensões disponíveis na prévia v0.6; sessões novas
+são versão 5. Consulte [Inspeção E4](E4-INSPECAO.md) para o comportamento atual.

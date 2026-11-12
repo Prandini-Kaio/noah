@@ -11,6 +11,7 @@ use std::{
 pub mod assembly;
 pub mod camera;
 pub mod demo;
+pub mod inspection;
 pub mod measurement;
 pub mod view;
 pub use assembly::Assembly;
@@ -117,6 +118,8 @@ pub struct Scene {
     pub calibration: Option<measurement::ScaleReference>,
     pub measurements: Vec<measurement::Measurement>,
     pub view: view::ViewOptions,
+    pub angles: Vec<inspection::AngularMeasurement>,
+    pub dimension_measurements: Vec<inspection::DimensionMeasurement>,
 }
 impl Default for Scene {
     fn default() -> Self {
@@ -134,6 +137,8 @@ impl Default for Scene {
             calibration: None,
             measurements: vec![],
             view: Default::default(),
+            angles: vec![],
+            dimension_measurements: vec![],
         }
     }
 }

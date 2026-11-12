@@ -184,7 +184,7 @@ impl Scene {
         for m in &self.measurements {
             if m.id.is_empty()
                 || m.id.len() > 128
-                || !ids.insert(&m.id)
+                || !ids.insert(m.id.clone())
                 || m.name.trim().is_empty()
                 || m.name.len() > 256
                 || m.method != "Distância euclidiana entre vértices, estado montado"
@@ -197,6 +197,7 @@ impl Scene {
                 return Err("medição sem comprimento válido".into());
             }
         }
+        self.validate_inspection(&mut ids)?;
         if let Some(c) = &self.calibration {
             if !c.known_distance.is_finite()
                 || c.known_distance <= 0.
@@ -260,7 +261,18 @@ pub fn export_report(scene: &Scene, path: &std::path::Path) -> Result<()> {
         let d = scene.distance(&measurement.a, &measurement.b)?;
         entries.push(serde_json::json!({"id":measurement.id,"name":measurement.name,"a":measurement.a,"b":measurement.b,"value":d.value,"unit":d.unit.map(|u|u.symbol()).unwrap_or("scene_units"),"scene_distance":d.scene_distance,"method":measurement.method,"uncertainty":measurement.uncertainty}));
     }
-    let report = serde_json::json!({"schema_version":1,"state":"assembled","metrology_validated":false,"calibration":scene.calibration,"sources":scene.sources,"measurements":entries});
+    let mut angles = Vec::new();
+    for m in &scene.angles {
+        angles.push(serde_json::json!({"id":m.id,"name":m.name,"a":m.a,"b":m.b,"c":m.c,"value":scene.angle_degrees(&m.a,&m.b,&m.c)?,"unit":"deg","method":m.method,"uncertainty":m.uncertainty}));
+    }
+    let mut dimensions = Vec::new();
+    for m in &scene.dimension_measurements {
+        let d = scene.dimensions(&m.target_id)?;
+        dimensions.push(serde_json::json!({"id":m.id,"name":m.name,"target_id":m.target_id,"bounds_world_scene_units":d.bounds,"scene_size":d.scene_size,"size":d.size,"unit":d.unit.map(|u|u.symbol()).unwrap_or("scene_units"),"method":m.method,"uncertainty":m.uncertainty}));
+    }
+    let transforms = scene.world_transforms(false)?;
+    let instances:Vec<_>=scene.items.iter().zip(&transforms).map(|(i,t)|serde_json::json!({"id":i.id,"name":i.name,"source_index":i.source,"parent":i.parent,"world_transform":{"translation":t.translation(),"rotation":t.rotation(),"scale":t.scale()},"frame":i.frame,"source_unit":i.unit})).collect();
+    let report = serde_json::json!({"schema_version":2,"state":"assembled","coordinate_convention":"right_handed_world_xyz; column_vectors; scale_then_rotation_then_translation","metrology_validated":false,"calibration":scene.calibration,"sources":scene.sources,"instances":instances,"assemblies":scene.assemblies,"measurements":entries,"angles":angles,"dimensions":dimensions});
     noah_pipeline::write_new(path, &serde_json::to_vec_pretty(&report)?)
 }
 
