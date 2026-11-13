@@ -84,3 +84,11 @@ base para refinamento, sem declarar toda E6 (novas capturas/comparação) conclu
 Sessão 7, relatório 4. Máscaras fotográficas e normalização fotométrica entram no
 backlog explícito; textura, CUDA real, CAD e novos sensores seguem pendentes.
 Plano PREPARO-LIMPEZA.md; evidências ../quality/PREPARO-LIMPEZA-REPORT.md.
+
+## UX e desmontagem — 2026-11-13
+Oito ajustes autorizados: diagnóstico selecionável/cópia, históricos de pastas,
+fluxo guiado, acesso à edição, inspetor estável, configurações separadas, foco de
+resultado e desmontagem. Camadas/armadura preservam fronteiras da hierarquia;
+painéis rígidos e estilhaços permanecem separados. Exemplo aninhado de 13 peças.
+Sessão 8 lê 1–7; relatório 4; preferências locais schema 1. Não conclui CAD,
+texturização, multissensor ou dense GPU. Evidências: UX-FLUXO-REPORT.md.

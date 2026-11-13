@@ -17,6 +17,7 @@ struct Edit {
 }
 #[derive(Default)]
 pub(super) struct CleaningUi {
+    pub parent: PathBuf,
     pub open: bool,
     pub rect_mode: bool,
     start: Option<Pos2>,
@@ -62,8 +63,16 @@ impl Edit {
         Ok(())
     }
 }
+impl CleaningUi {
+    pub fn with_parent(parent: PathBuf) -> Self {
+        Self {
+            parent,
+            ..Default::default()
+        }
+    }
+}
 impl Desktop {
-    fn begin_cleaning(&mut self) -> noah_pipeline::Result<()> {
+    pub(super) fn begin_cleaning(&mut self) -> noah_pipeline::Result<()> {
         let item = self
             .scene
             .items
@@ -114,7 +123,7 @@ impl Desktop {
         self.cleaning.radius =
             ((0..3).map(|a| (max[a] - min[a]).powi(2)).sum::<f64>()).sqrt() / 100.;
         self.cleaning.min_neighbours = 3;
-        self.cleaning.name = self.reconstruction.available_name("nuvem-limpa");
+        self.cleaning.name = jobs::available_name(&self.cleaning.parent, "nuvem-limpa");
         self.cleaning.status =
             "Edição temporária iniciada. Salve uma nova revisão para persistir.".into();
         self.restore_blast();
@@ -191,6 +200,7 @@ impl Desktop {
    ui.add_enabled_ui(!busy,|ui|{
     if ui.button(if self.cleaning.edit.is_some(){"Reiniciar da nuvem selecionada"}else{"Editar nuvem selecionada"}).clicked(){start=true;}
     if let Some(e)=&mut self.cleaning.edit{
+     ui.strong(format!("Editando: {}",self.scene.items.iter().find(|i|i.id==e.id).map(|i|i.name.as_str()).unwrap_or("nuvem de origem")));
      ui.label(format!("Original: {} · Atual: {} · Seleção: {}",e.active.len(),e.active.iter().filter(|&&v|v).count(),e.selection.iter().filter(|&&v|v).count()));
      ui.label("Coordenadas locais da fonte; unidades originais. Não altera medidas antigas.");
      ui.checkbox(&mut self.cleaning.show_removed,"Comparar: mostrar removidos em vermelho");
@@ -210,8 +220,8 @@ if ui.button("Cancelar prévia").clicked(){e.candidate=None;}});}
      ui.horizontal(|ui|{if ui.add_enabled(!e.history.is_empty(),egui::Button::new("Desfazer limpeza")).clicked()&&let Some((active,recipe))=e.history.pop(){e.active=active;e.recipe=recipe;e.candidate=None;e.selection.fill(false);}
 if ui.button("Ver nuvem no viewport").clicked(){close=true;}});
      if ui.button("Descartar edição temporária").clicked(){discard=true;}
-     ui.separator();ui.horizontal(|ui|{if ui.button("Pasta de resultados").clicked(){choose_output=true;}ui.label(self.reconstruction.parent.display().to_string());});ui.horizontal(|ui|{ui.label("Novo nome");ui.text_edit_singleline(&mut self.cleaning.name);});
-     if ui.button("Salvar e abrir revisão limpa").clicked(){let name=&self.cleaning.name;if Path::new(name).components().count()!=1||matches!(name.as_str(),"."|"..")||name.trim().is_empty(){self.cleaning.status="Nome inválido".into();}else{let output=self.reconstruction.parent.join(name);let e=e.clone();let(tx,rx)=mpsc::channel();std::thread::spawn(move||{let indices=e.active.iter().enumerate().filter_map(|(i,&a)|a.then_some(i)).collect();let result=cloud_revision::create(&output,e.source,&e.cloud,indices,e.recipe).map(|()|output);let _=tx.send(result);});self.cleaning.save_worker=Some(rx);}}
+     ui.separator();ui.horizontal(|ui|{if ui.button("Pasta de resultados").clicked(){choose_output=true;}ui.label(self.cleaning.parent.display().to_string());});ui.horizontal(|ui|{ui.label("Novo nome");ui.text_edit_singleline(&mut self.cleaning.name);});
+     if ui.button("Salvar e abrir revisão limpa").clicked(){let name=&self.cleaning.name;if Path::new(name).components().count()!=1||matches!(name.as_str(),"."|"..")||name.trim().is_empty(){self.cleaning.status="Nome inválido".into();}else{let output=self.cleaning.parent.join(name);let e=e.clone();let(tx,rx)=mpsc::channel();std::thread::spawn(move||{let indices=e.active.iter().enumerate().filter_map(|(i,&a)|a.then_some(i)).collect();let result=cloud_revision::create(&output,e.source,&e.cloud,indices,e.recipe).map(|()|output);let _=tx.send(result);});self.cleaning.save_worker=Some(rx);}}
     }
    });if busy{ui.spinner();ctx.request_repaint_after(Duration::from_millis(75));}ui.label(&self.cleaning.status);ui.label("Até 200 mil pontos. Filtros podem remover detalhes reais; prévia não é classificação garantida. Desfazer guarda 8 operações; fechar mantém a edição temporária.");
   });
@@ -225,7 +235,7 @@ if ui.button("Ver nuvem no viewport").clicked(){close=true;}});
             self.cleaning.rect_mode = false;
         }
         if choose_output {
-            self.choose(Purpose::Output);
+            self.choose(Purpose::CleaningOutput);
         }
         if start {
             let r = self.begin_cleaning();

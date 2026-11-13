@@ -1,123 +1,60 @@
-NOAH 2.0 — Prévia de inspeção, montagens e interface Arctic
+NOAH 2.0 — v0.10: fluxo guiado e desmontagem
 
-COMO ABRIR
-Extraia toda a pasta e abra NOAH com duplo clique. Não precisa de Rust/Cargo
-ou terminal. Se necessário, habilite execução nas propriedades do arquivo.
+ABRIR
+Extraia toda a pasta e abra NOAH. Linux x86_64, glibc 2.39+, X11/XWayland,
+OpenGL. Não precisa de Rust. COLMAP 3.11.x separado para reconstruir.
 
-REQUISITOS
-Linux x86_64, glibc 2.39+, X11 ou XWayland, X11/xkbcommon e OpenGL.
-Não é AppImage nem pacote universal. Wayland nativo não foi validado.
+RECONSTRUIR
+Reconstruir… > 1 Configurar: escolha fotos, saída desejada, pasta e nome novos.
+Motor em Configurações gerais. Preparar/selecionar imagens é opcional.
+Iniciar reconstrução > 2 Processar: etapas, cancelamento e diagnóstico.
+3 Resultados: Visualizar no workspace fecha a janela e foca a saída; Editar nuvem
+abre seleção/recorte/outliers/prévia/desfazer e salvamento de nova revisão.
+Fotos escolhidas não significam objeto criado; abra um resultado para ver na cena.
+As pastas de imagens, motor, resultado, preparo, limpeza e exportação são
+lembradas separadamente, inclusive após reiniciar. Motor lembrado não executa
+sozinho. Preferências em XDG_CONFIG_HOME/noah/preferences.json ou ~/.config/noah.
 
-TESTE INCLUÍDO
-Importar > Geometria > examples/inspection-box.obj. Selecione a peça na árvore.
-Medidas > Ângulo > Seleção exata: A=6 B=5 C=8 dá 90 graus (B é o vértice).
-Em Distância, A=2 B=1; declare 200 mm e aplique a referência de escala.
-Dimensões XYZ deve indicar 200 x 300 x 400 mm. Veja examples/LEIA-ME.txt.
-Esses são dados sintéticos CC0, sem validação metrológica de captura real.
+LOGS
+Texto selecionável, somente leitura. Ctrl+A/C e botões para copiar; filtros por
+etapa/fluxo, atualizar. Até 128 KiB finais por fluxo e 2 MiB totais; arquivo
+completo permanece no run. Stderr do COLMAP também contém mensagens informativas.
 
-WORKSPACE E MONTAGENS
-Workspace permite Novo, Abrir, Projeto/run e Explorar montagem de exemplo.
-O exemplo de montagem materializa dez peças e três grupos numa pasta escolhida.
-Importar aceita nuvens PLY ASCII XYZ/RGB e malhas OBJ triangulares. A árvore
-permite buscar, selecionar e ocultar peças; Nova montagem cria um grupo.
-No inspetor, escolha o pai e os ajustes locais. Mudar o pai preserva coordenadas
-locais e pode mudar a posição mundial. A montagem permanece manual.
+INSPETOR
+Identidade/tipo/caminho da seleção sempre no topo. Objeto: transformações e pai;
+Análise: medidas/escala/dimensões; Ações: editar, gerar superfície, alinhar,
+exportar. Pipeline e efeitos têm ferramentas próprias. A nuvem pode ser editada
+pelo resultado, toolbar ou Ações. Até 200 mil pontos; fontes preservadas.
 
-INTERFACE E NAVEGAÇÃO
-Módulos no topo mudam o contexto; o viewport permanece aberto. Painéis são
-redimensionáveis e ocultáveis. Maximizar amplia o viewport; Restaurar volta.
-A toolbar oferece Selecionar, Pan, Órbita, Câmera, Enquadrar e Exibição.
-Direito/meio ou Shift + arrastar: pan. Roda: zoom. F: enquadrar.
-Preferências > Tema e opções visuais oferece Arctic Dark (padrão), Light,
-movimento reduzido, réguas, anotações e controles de seleção.
-Ortográfica tem escala uniforme; em perspectiva a régua vale no plano do alvo.
-Réguas medem U/V projetados, não comprimentos 3D de qualquer aresta inclinada.
+NAVEGAR
+Seletor de ferramenta na toolbar: Selecionar, Pan, Órbita. Direito/meio ou Shift
++ arrastar: pan; roda: zoom; F: enquadrar. Exibição reúne arame, grade, tipos de
+geometria e maximização. Ao focar um resultado, demais objetos são ocultados;
+reative suas caixas na árvore para comparar. Tema/réguas em Configurações > Tema.
+Réguas em perspectiva valem no plano do alvo, sem garantia de precisão física.
 
-EXPLOSÃO E ESTILHAÇOS
-Em Montagem/Inspeção > Explosão e estilhaços, Estilhaçar > Explodir dispersa
-fragmentos visuais. Controle força/tempo, pause, remonte ou restaure. Não altera
-fontes e não grava fragmentos na sessão. Nuvens dispersam pontos. Não há
-fratura volumétrica, interior nem colisões; limite de 20 mil fragmentos amostrados.
-Componentes conserva Separar peças/Montada e afastamento em unidades da cena.
-Abrir Medir restaura a prévia de estilhaçamento antes da seleção de vértices.
+MONTAR E DESMONTAR
+Criar montagem na seleção cria filho de uma montagem selecionada, ou na raiz.
+Objeto > Montagem pai organiza peças/grupos; conserva coordenadas locais.
+Desmontagem… é ferramenta própria: radial, camadas ou armadura progressiva.
+Nível 1 conserva submontagens; níveis maiores abrem filhos. Desmontar/Remontar
+fecha a janela para mostrar a animação. Reabra para ajustar/restaurar.
+Fragmentar superfície: estilhaços anteriores ou painéis rígidos sem subdivisão
+fractal. É efeito temporário, sem interior/colisão/fratura física. Não cria
+componentes ocultos de um scan. Exportação/medidas continuam no estado montado.
+Workspace > Explorar armadura por camadas cria exemplo sintético CC0 de 13 peças
+com carcaça e núcleo, em pasta nova. Teste profundidades 1 e 4.
 
-MEDIÇÕES
-Medidas reúne Distância, Ângulo ABC e Dimensões XYZ; o inspetor usa a aba Análise.
-Selecione vértices por clique ou índice original (inicia em 1). A janela retorna
-após os dois/três pontos. Snap tem raio, filtro e teste frontal até 200 mil faces.
-Registre com nome. Distâncias e dimensões usam escala declarada em mm/m, com
-origem da referência. Se seu comprimento mudar, recalibre ou remova a referência.
-Ângulos de 0 a 180 graus independem de escala uniforme. Caixas XYZ incluem todos
-os filhos/vértices, mesmo ocultos, e mudam com a rotação. Não são caixas mínimas
-orientadas nem medições de volume. A explosão não muda os valores montados.
-Incerteza desconhecida; escala e casas decimais não garantem precisão física.
+DADOS E SESSÕES
+Kit de 12 fotos e superfícies pré-processadas em examples/pipeline. Exemplo de
+outliers em examples/limpeza (348 pontos, SOR k16 sigma2 remove5). Exemplo métrico
+em examples/inspection-box.obj; alinhamento em examples/alinhamento.
+Salvar exige arquivo novo; sessão 8 lê 1–7; relatório 4. Não mova fontes/revisões:
+a sessão usa caminhos absolutos e não é autocontida. Conclua/descarte edição
+pendente antes de salvar/substituir/sair. Escala declarada não garante metrologia.
+Sem textura UV, CAD ou validação dense GPU completa. Renderer tem profundidade
+aproximada e amostragem; não promete geometria oculta ou precisão industrial.
 
-SALVAR E EXPORTAR
-Salvar cria arquivo novo, sessão versão 7 (lê 1-6). Apps antigos não abrem versão 7.
-As definições de medidas são recalculadas ao reabrir. Fontes usam caminhos
-absolutos: não as mova/apague. A sessão não é um projeto autocontido.
-Exportação de peça usa posição montada; relatório JSON versão 4 contém medidas,
-fontes/hashes, transformações e métodos. Destinos existentes são preservados.
-
-RECONSTRUÇÃO
-Reconstrução abre configuração, etapas, logs e cancelamento do pipeline.
-Escolha fotos, COLMAP 3.11.x local, destino e nome novo; depois inicie e abra a
-nuvem resultante. COLMAP não está incluído. Sparse usa CPU; dense exige CUDA/GPU
-e sua validação real continua pendente. O app não baixa motores nem fotografias.
-
-LIMITES E LICENÇAS
-Renderer amostrado (50 mil pontos / 20 mil faces), profundidade aproximada,
-sem z-buffer 3D ou CAD. Dimensões usam todos os vértices, sem essa amostragem.
-Área, volume, novas primitivas e alinhamento por rotação/ICP ainda não disponíveis.
-Código MIT; exemplos CC0-1.0. Licenças de dependências em third-party-licenses.
-Código e relatórios: https://github.com/Prandini-Kaio/noah
-
-KIT DE PIPELINE E ALINHAMENTO (v0.7)
-Reconstrução > Usar fotos do kit seleciona 12 imagens sintéticas.
-Configure COLMAP 3.11.x local e destino novo; selecione um modo CPU.
-Ao concluir, abra a nuvem, registre medidas, salve/reabra e exporte PLY/relatório.
-Abrir nuvem pronta é apenas inspeção de resultado histórico, sem reconstrução.
-Workspace > Abrir peças de alinhamento do kit fornece malhas sintéticas separadas.
-Montagem > Alinhar peças: movel.obj/1 até fixa.obj/2 dá ΔX=-4 u. cena.
-Há prévia, aplicar e desfazer guardado. É somente translação, sem rotação/ICP.
-Arame volta a mostrar arestas sem preenchimento; Sobrepor arestas é separado.
-Estilhaços padrão são menores e se espalham mais; escolha tamanho, força e
-acompanhamento de câmera antes de Explodir. Não alteram fontes nem medidas.
-Guia: examples/pipeline/README.md e examples/alinhamento/README.md.
-
-SUPERFÍCIE 3D (v0.8)
-Reconstrução > Malha rápida da esparsa · CPU gera faces sem CUDA.
-Escolha fotos, COLMAP 3.11.x e novo destino > Iniciar pelas fotos.
-Ao concluir, Abrir malha no workspace. Abrir superfície pronta usa o exemplo
-pré-processado sem executar COLMAP. Para continuar um run antigo, abra sua pasta
-por Workspace > Projeto/run, selecione a fonte e escolha em Reconstrução:
-Usar run selecionado para gerar malha > COLMAP > destino/nome novos > Gerar malha
-do run > Abrir malha no workspace. Um PLY isolado não substitui o run e câmeras.
-Original preservado, derivado rastreado em novo diretório. Delaunay da esparsa é
-aproximado, pode incluir fundo/buracos; sem textura UV, CAD ou precisão garantida.
-Modo denso requer CUDA nas etapas de profundidade; Poisson gera a superfície.
-Esse fluxo denso completo ainda não foi validado com GPU real. Sessões antigas
-continuam abrindo suas nuvens, mesmo quando o run possui uma superfície nova.
-
-PREPARAÇÃO E LIMPEZA (v0.9)
-Reconstrução > Preparar imagens… > Analisar pasta escolhida: revise detalhe,
-exposição, dimensões e duplicatas. Marque fotos (mínimo 3), escolha destino/nome
-novos > Salvar preparo e usar no pipeline. Lado maior 0 mantém arquivo original;
-320–12000 gera PNG proporcional, sem EXIF/rotação automática. Intrínsecos serão
-estimados novamente. Avisos são heurísticos, sem descarte automático.
-Reconstrua > Abrir esparsa. Se abrir run anterior como malha, use Abrir nuvem
-esparsa do run selecionado. Selecione a nuvem > Limpar nuvem… > Editar nuvem.
-Prévia SOR ou raio marca candidatos em vermelho; aplicar, cancelar, comparar e
-desfazer. Retângulo atravessa profundidade; caixa XYZ usa coordenadas locais.
-Remover/Isolar seleção e Salvar e abrir revisão limpa preservam fonte/índices/RGB.
-Até 200 mil pontos; oito operações de desfazer. Fechar mantém edição temporária;
-salve a revisão ou descarte antes de salvar workspace. Não transfere escala ou
-medidas antigas para os novos índices. Snapshot normalizado, não todos atributos
-do sensor. Original é ocultado após abrir revisão para facilitar comparação.
-Próxima etapa: selecione a revisão limpa originada em run sparse > Reconstrução >
-Usar run selecionado para gerar malha > malha CPU > novo destino > Gerar malha do
-run. Novo modelo mantém câmeras/tracks retidos; não repete SfM nem muda o pai.
-PLY isolado pode ser limpo, mas não contém as câmeras para gerar essa superfície.
-Exemplo: examples/limpeza/nuvem-com-outliers.ply. SOR k=16, sigma=2: 5 candidatos,
-343 mantidos; raio=0.2, mínimo=3 também. Sem máscara de fotos, textura UV ou CAD.
-Sessão 7 lê 1–6; relatório 4. Guia completo: PREPARO-LIMPEZA.md junto do app.
+Guia atual: UX-GUIA.md. Preparação/limpeza: PREPARO-LIMPEZA.md.
+Código MIT; exemplos CC0. Licenças de dependências em third-party-licenses.
+https://github.com/Prandini-Kaio/noah

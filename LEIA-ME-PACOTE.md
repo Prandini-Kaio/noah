@@ -30,3 +30,7 @@ docs/quality/E2-MALHA-REPORT.md para o estado atual; registros acima são histó
 Atualização v0.9: preparação/seleção de imagens, limpeza de nuvem e superfície da
 revisão limpa. Sessão 7 lê 1–6; relatório 4. Guia em docs/desktop/PREPARO-LIMPEZA.md;
 relatório atual em docs/quality/PREPARO-LIMPEZA-REPORT.md.
+
+Atualização v0.10: fluxo guiado, logs/cópia, pastas independentes e desmontagem
+por camadas/armadura/painéis. Sessão 8 lê 1–7; relatório 4. Guia atual em
+docs/desktop/UX-GUIA.md e evidências em docs/quality/UX-FLUXO-REPORT.md.

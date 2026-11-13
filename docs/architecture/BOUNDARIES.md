@@ -81,3 +81,13 @@ sem I/O. Storage/cloud_revision persiste snapshot/índices/receita com hashes;
 workspace usa fonte CloudRevision e sessão 7 (lê 1–6), relatório 4. Desktop mantém
 prévia/desfazer temporários. Surface filtra novo modelo COLMAP e observações antes
 de restaurar BIN e gerar Delaunay, preservando o pai. Contrato: ADR 0012.
+
+## UX e apresentação / sessão 8
+Desktop/preferences guarda motor e históricos por finalidade fora da sessão.
+Pipeline executa somente pelo passo Configurar; Processar/Resultados são leitura
+ou abertura/edição de saída. Inspetor mantém identidade e abas fixas. Logs somente
+leitura selecionáveis/copiáveis, limites explícitos. Workspace/disassembly calcula
+translações rígidas de fronteiras hierárquicas; world_transforms(false) segue
+montado. Painéis de superfície ficam no cache Blast, não nos assets. Sessão 8 lê
+1–7 com apresentação nova padrão radial; relatório geométrico mantém schema 4.
+Contrato: ADR 0013.

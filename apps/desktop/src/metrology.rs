@@ -173,7 +173,7 @@ impl Desktop {
     self.measurement_list(ui);
     let has=!self.scene.measurements.is_empty()||!self.scene.angles.is_empty()||!self.scene.dimension_measurements.is_empty();
     if ui.add_enabled(has,egui::Button::new("Exportar relatório de medições")).clicked(){self.choose(Purpose::ExportMeasurements);}
-    ui.label(RichText::new("Salvar revisão preserva âncoras, caixas e escala (sessão 7).").size(10.).color(p.secondary));
+    ui.label(RichText::new("Salvar revisão preserva âncoras, caixas e escala (sessão 8).").size(10.).color(p.secondary));
    });
   });
         self.show_measurements = open && !pick;

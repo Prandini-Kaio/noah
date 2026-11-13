@@ -10,10 +10,47 @@ pub enum Purpose {
     Images,
     Engine,
     Output,
+    PreparationOutput,
+    CleaningOutput,
+    ArmourDemo,
     Export,
     ExportMeasurements,
 }
 impl Purpose {
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Import => "import",
+            Self::Project => "project",
+            Self::OpenSession => "open_session",
+            Self::SaveSession => "save_session",
+            Self::Demo => "demo",
+            Self::ArmourDemo => "armour_demo",
+            Self::Images => "images",
+            Self::Engine => "engine",
+            Self::Output => "output",
+            Self::PreparationOutput => "preparation_output",
+            Self::CleaningOutput => "cleaning_output",
+            Self::Export => "export",
+            Self::ExportMeasurements => "report",
+        }
+    }
+    pub fn key_label(key: &str) -> &str {
+        match key {
+            "images" => "Fotografias",
+            "engine" => "Motor COLMAP",
+            "output" => "Resultados da pipeline",
+            "preparation_output" => "Preparo de fotos",
+            "cleaning_output" => "Revisões de nuvem",
+            "import" => "Importação 3D",
+            "project" => "Projetos/runs",
+            "open_session" => "Abrir workspace",
+            "save_session" => "Salvar workspace",
+            "export" => "Exportação 3D",
+            "report" => "Relatórios",
+            "demo" | "armour_demo" => "Exemplos de montagem",
+            _ => key,
+        }
+    }
     fn title(self) -> &'static str {
         match self {
             Self::Import => "Importar geometria",
@@ -23,18 +60,32 @@ impl Purpose {
             Self::Demo => "Criar montagem de exemplo",
             Self::Images => "Escolher pasta de fotografias",
             Self::Engine => "Escolher executável COLMAP",
+            Self::PreparationOutput => "Pasta de preparo das fotos",
+            Self::CleaningOutput => "Pasta de revisões de nuvem",
+            Self::ArmourDemo => "Criar montagem de camadas",
             Self::Output => "Escolher pasta de resultados",
             Self::Export => "Exportar peça montada",
             Self::ExportMeasurements => "Exportar relatório de medições",
         }
     }
     fn folder(self) -> bool {
-        matches!(self, Self::Project | Self::Images | Self::Output)
+        matches!(
+            self,
+            Self::Project
+                | Self::Images
+                | Self::Output
+                | Self::PreparationOutput
+                | Self::CleaningOutput
+        )
     }
     fn creates(self) -> bool {
         matches!(
             self,
-            Self::SaveSession | Self::Demo | Self::Export | Self::ExportMeasurements
+            Self::SaveSession
+                | Self::Demo
+                | Self::ArmourDemo
+                | Self::Export
+                | Self::ExportMeasurements
         )
     }
 }
@@ -61,6 +112,7 @@ impl Browser {
             name: match purpose {
                 Purpose::SaveSession => "workspace-001.noah.json",
                 Purpose::Demo => "montagem-noah",
+                Purpose::ArmourDemo => "montagem-camadas",
                 Purpose::Export => "peca.obj",
                 Purpose::ExportMeasurements => "medicoes.json",
                 _ => "",
@@ -68,6 +120,9 @@ impl Browser {
             .into(),
             error: String::new(),
         }
+    }
+    pub fn directory(&self) -> &Path {
+        &self.dir
     }
     pub fn export_extension(&mut self, mesh: bool) {
         self.name = if mesh { "peca.obj" } else { "peca.ply" }.into();
@@ -191,11 +246,13 @@ impl Browser {
                     }
                     if self.purpose.creates()
                         && ui
-                            .button(if matches!(self.purpose, Purpose::Demo) {
-                                "Criar montagem"
-                            } else {
-                                "Salvar"
-                            })
+                            .button(
+                                if matches!(self.purpose, Purpose::Demo | Purpose::ArmourDemo) {
+                                    "Criar montagem"
+                                } else {
+                                    "Salvar"
+                                },
+                            )
                             .clicked()
                     {
                         if Path::new(&self.name).components().count() != 1

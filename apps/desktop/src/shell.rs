@@ -2,7 +2,6 @@
 use super::*;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Module {
-    Capture,
     Reconstruction,
     Assembly,
     Inspection,
@@ -12,7 +11,6 @@ pub enum Module {
 impl Module {
     fn name(self) -> &'static str {
         match self {
-            Self::Capture => "Captura",
             Self::Reconstruction => "Reconstrução",
             Self::Assembly => "Montagem",
             Self::Inspection => "Inspeção",
@@ -74,46 +72,25 @@ impl Desktop {
                             self.open_alignment_kit();
                             ui.close();
                         }
+                        if ui.button("Explorar armadura por camadas…").clicked(){self.choose(Purpose::ArmourDemo);ui.close();}
                         if ui.button("Explorar montagem de exemplo…").clicked() {
                             self.choose(Purpose::Demo);
                             ui.close();
                         }
                     });
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.menu_button("Preferências…", |ui| {
-                            if ui.button("Tema e opções visuais…").clicked() {
-                                self.show_visual = true;
-                                ui.close();
-                            }
-                            ui.checkbox(&mut self.left_visible, "Painel de estrutura");
-                            ui.checkbox(&mut self.right_visible, "Inspetor");
-                            ui.checkbox(&mut self.maximized, "Maximizar viewport");
-                        });
+                        if ui.button("Configurações…").clicked(){self.show_general=true;}
                         if theme::action(ui, "Salvar", p, false).clicked() {
                             if self.cleaning_target().is_some(){self.notice(Err("Salve a revisão limpa ou descarte a edição antes de salvar o workspace".into()),"");}else{
                             self.choose(Purpose::SaveSession);
                             }
                         }
-                        let ready = self.reconstruction.ready_inputs();
-                        if ui
-                            .add_enabled(
-                                ready,
-                                egui::Button::new(
-                                    RichText::new("Rodar pipeline").color(p.background),
-                                )
-                                .fill(p.primary),
-                            )
-                            .on_hover_text("Configure fotos, COLMAP e destino em Reconstrução")
-                            .clicked()
-                        {
-                            let r = self.reconstruction.start();
-                            self.notice(r, "Pipeline iniciado.");
-                            self.show_reconstruction = true;
-                        }
+                        if ui.add(egui::Button::new(RichText::new("Reconstruir…").color(p.background)).fill(p.primary)).clicked(){self.show_reconstruction=true;self.pipeline_tab=if self.reconstruction.worker.is_some(){1}else if self.reconstruction.manifest.is_some(){2}else{0};}
                         ui.menu_button("Importar…", |ui| {
                             if ui.button("Fotografias…").clicked() {
                                 self.choose(Purpose::Images);
-                                self.module = Module::Capture;
+                                self.module = Module::Reconstruction;
+                                self.show_reconstruction=true;self.pipeline_tab=0;
                                 self.right_visible = true;
                                 ui.close();
                             }
@@ -127,7 +104,6 @@ impl Desktop {
                 ui.add_space(8.);
                 ui.horizontal(|ui| {
                     for m in [
-                        Module::Capture,
                         Module::Reconstruction,
                         Module::Assembly,
                         Module::Inspection,
@@ -139,7 +115,9 @@ impl Desktop {
                             self.right_visible = true;
                             self.maximized = false;
                             self.analysis_tab = m == Module::Measures;
+                            if m == Module::Assembly{self.inspector_tab=2;}
                             if m == Module::Reconstruction {
+                                self.pipeline_tab=if self.reconstruction.worker.is_some(){1}else if self.reconstruction.manifest.is_some(){2}else{0};
                                 self.show_reconstruction = true;
                             }
                         }
@@ -176,87 +154,13 @@ impl Desktop {
                                 },
                             );
                         });
-                        ui.label(
-                            RichText::new(self.last_dir.display().to_string())
-                                .size(10.)
-                                .color(p.secondary),
-                        );
-                        ui.add_space(16.);
-                        egui::CollapsingHeader::new("Fluxo de reconstrução")
-                            .default_open(self.scene.items.is_empty())
-                            .show(ui, |ui| {
-                                let captured = self.reconstruction.images.is_dir();
-                                let processing = self.reconstruction.worker.is_some();
-                                let pipeline_state = if processing {
-                                    "Processando"
-                                } else {
-                                    match self.reconstruction.manifest.as_ref().map(|m| &m.status) {
-                                        Some(noah_pipeline::Status::Succeeded) => "Concluído",
-                                        Some(noah_pipeline::Status::Failed) => {
-                                            "Erro · consulte diagnóstico"
-                                        }
-                                        Some(noah_pipeline::Status::Cancelled) => "Cancelado",
-                                        Some(noah_pipeline::Status::Prepared) => "Preparado",
-                                        Some(noah_pipeline::Status::Running) => {
-                                            "Execução registrada"
-                                        }
-                                        None => "A configurar",
-                                    }
-                                };
-                                for (n, title, detail, state, module) in [
-                                    (
-                                        1,
-                                        "Captura",
-                                        "Importar e validar fotos",
-                                        if captured {
-                                            "Fotos escolhidas"
-                                        } else {
-                                            "Não iniciado"
-                                        },
-                                        Module::Capture,
-                                    ),
-                                    (
-                                        2,
-                                        "Reconstrução",
-                                        "Nuvem e malha",
-                                        pipeline_state,
-                                        Module::Reconstruction,
-                                    ),
-                                    (
-                                        3,
-                                        "Montagem",
-                                        "Organizar componentes",
-                                        if self.scene.items.is_empty() {
-                                            "Sem geometria"
-                                        } else {
-                                            "Geometria aberta"
-                                        },
-                                        Module::Assembly,
-                                    ),
-                                ] {
-                                    if ui
-                                        .selectable_label(
-                                            self.module == module,
-                                            format!("{n}   {title}"),
-                                        )
-                                        .clicked()
-                                    {
-                                        self.module = module;
-                                        if module != Module::Assembly {
-                                            self.show_reconstruction = true;
-                                        }
-                                    }
-                                    ui.label(RichText::new(detail).size(10.).color(p.secondary));
-                                    ui.label(RichText::new(state).size(10.).color(
-                                        if processing && n == 2 {
-                                            p.warning
-                                        } else {
-                                            p.secondary
-                                        },
-                                    ));
-                                    ui.add_space(8.);
-                                }
-                            });
+                        let clouds=self.scene.items.iter().filter(|i|matches!(i.geometry.as_ref(),Geometry::Points(_))).count();
+                        ui.label(if self.scene.items.is_empty(){"Nenhum objeto 3D aberto".into()}else{format!("{} nuvens · {} malhas",clouds,self.scene.items.len()-clouds)});
+                        if self.reconstruction.worker.is_some(){ui.colored_label(p.warning,"Reconstrução em andamento");}
+                        else if self.cleaning_target().is_some(){ui.colored_label(p.warning,"Editando nuvem · revisão ainda não salva");}
+                        else if self.scene.explosion>0.||self.blast.is_some(){ui.colored_label(p.warning,"Vista explodida · apresentação");}
+                        ui.add_space(8.);
+                        egui::CollapsingHeader::new("Pipeline · etapas").default_open(self.scene.items.is_empty()).show(ui,|ui|{for(tab,label)in["1 · Configurar entrada","2 · Acompanhar processamento","3 · Visualizar / editar resultados"].iter().enumerate(){if ui.button(*label).clicked(){self.pipeline_tab=tab;self.show_reconstruction=true;self.module=Module::Reconstruction;}}});
                         ui.add_space(12.);
                         ui.separator();
                         ui.label(RichText::new("ESTRUTURA DO CONJUNTO").size(11.).strong());
@@ -292,9 +196,11 @@ impl Desktop {
                                 self.pending.is_none() && self.blast.is_none(),
                                 |ui| {
                                     ui.text_edit_singleline(&mut self.new_group_name);
-                                    if ui.button("Criar montagem").clicked() {
+                                    if ui.button("Criar montagem na seleção").on_hover_text("Se uma montagem estiver selecionada, cria uma submontagem dentro dela; caso contrário, cria na raiz.").clicked() {
+                                        let parent=self.scene.selected.clone().filter(|id|self.scene.assemblies.iter().any(|g|&g.id==id));
                                         match self.scene.add_assembly(self.new_group_name.clone()) {
                                             Ok(id) => {
+                                                if let Some(parent)=parent{let r=self.scene.set_parent(&id,Some(parent));self.notice(r,"Submontagem criada dentro da seleção.");}else{self.notice(Ok(()),"Montagem criada na raiz.");}
                                                 self.scene.selected = Some(id);
                                                 self.dirty = true;
                                             }
@@ -318,40 +224,76 @@ impl Desktop {
     }
     pub(super) fn inspector(&mut self, ctx: &egui::Context) {
         let p = self.palette();
-        egui::SidePanel::right("context_inspector").default_width(300.).width_range(260.0..=420.).resizable(true).frame(egui::Frame::new().fill(p.surface).inner_margin(12)).show(ctx,|ui|{
-   ui.horizontal(|ui|{ui.selectable_value(&mut self.analysis_tab,false,"Propriedades");ui.selectable_value(&mut self.analysis_tab,true,"Análise");if ui.small_button("×").on_hover_text("Ocultar inspetor").clicked(){self.right_visible=false;}});ui.separator();
-   egui::ScrollArea::vertical().id_salt("context_scroll").show(ui,|ui|{
-    ui.add_enabled_ui(self.pending.is_none(),|ui|{
-     if self.analysis_tab{
-      self.inspection_summary(ui);
-     }else{
-      match self.module{
-       Module::Capture=>{ui.heading("Captura");ui.label("Escolha a pasta local de fotografias para o pipeline.");if ui.button("Importar fotos…").clicked(){self.choose(Purpose::Images);}ui.label(self.reconstruction.images.display().to_string());if ui.button("Preparar fotografias…").clicked(){self.preparation.open=true;}
-if ui.button("Configurar reconstrução").clicked(){self.show_reconstruction=true;}ui.separator();},
-       Module::Reconstruction=>{ui.heading("Reconstrução");ui.label(&self.reconstruction.status);if ui.button("Configuração e acompanhamento").clicked(){self.show_reconstruction=true;}ui.separator();},
-       Module::Export=>{ui.heading("Exportação");ui.label("Exporta a peça no estado montado e preserva os dados originais.");let selected=self.scene.items.iter().any(|i|Some(&i.id)==self.scene.selected.as_ref());if ui.add_enabled(selected,egui::Button::new("Exportar peça montada…")).clicked(){self.choose(Purpose::Export);}
-if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::ExportMeasurements);}ui.separator();},_=>{}
-      }
-      if self.module==Module::Assembly && ui.button("Alinhar peças…").clicked(){self.open_alignment();}
-      egui::CollapsingHeader::new("Seleção e transformações").default_open(true).show(ui,|ui|{
-       if self.blast.is_some(){ui.label("Prévia temporária ativa. Restaure para editar a seleção.");}else{self.selection_properties(ui);}
-      });
-      ui.add_space(12.);
-      if ui.button("Limpar nuvem…").clicked(){self.cleaning.open=true;}
-      if matches!(self.module,Module::Assembly|Module::Inspection){egui::CollapsingHeader::new("Explosão e estilhaços").default_open(true).show(ui,|ui|self.blast_controls(ui));ui.add_space(12.);}
-      egui::CollapsingHeader::new("Visualização").default_open(self.module==Module::Inspection).show(ui,|ui|{
-       ui.horizontal(|ui|{for (mode,label) in [(DisplayMode::Solid,"Sólido"),(DisplayMode::Wire,"Arame"),(DisplayMode::Points,"Pontos")]{if ui.selectable_value(&mut self.display_mode,mode,label).changed(){self.scene.wireframe=mode==DisplayMode::Wire;self.dirty=true;}}});
-       ui.checkbox(&mut self.show_mesh,"Exibir malhas");ui.checkbox(&mut self.show_clouds,"Exibir nuvens");
-       if ui.checkbox(&mut self.scene.grid,"Grade de navegação").changed(){self.dirty=true;}
-       ui.checkbox(&mut self.wire_overlay,"Sobrepor arestas ao sólido");
-       if ui.add(egui::Slider::new(&mut self.scene.point_size,1.0..=8.0).text("Ponto / px")).changed(){self.dirty=true;}
-       if ui.button("Tema, réguas e opções…").clicked(){self.show_visual=true;}
-       ui.label(RichText::new("Exibição amostrada; profundidade aproximada.").size(10.).color(p.secondary));
-      });
-     }
-    });
-   });
-  });
+        if self.analysis_tab {
+            self.inspector_tab = 1;
+            self.analysis_tab = false;
+        }
+        egui::SidePanel::right("context_inspector").default_width(320.).width_range(290.0..=440.).resizable(true).frame(egui::Frame::new().fill(p.surface).inner_margin(12)).show(ctx,|ui|{
+            ui.horizontal(|ui|{ui.strong("Inspetor");if ui.small_button("×").on_hover_text("Ocultar inspetor").clicked(){self.right_visible=false;}});
+            let item=self.scene.selected.as_ref().and_then(|id|self.scene.items.iter().find(|i|&i.id==id));
+            let group=self.scene.selected.as_ref().and_then(|id|self.scene.assemblies.iter().find(|g|&g.id==id));
+            egui::Frame::group(ui.style()).fill(p.elevated).show(ui,|ui|{ui.set_min_width(ui.available_width());if let Some(i)=item{ui.colored_label(p.primary,if matches!(i.geometry.as_ref(),Geometry::Points(_)){"NUVEM SELECIONADA"}else{"MALHA SELECIONADA"});ui.strong(&i.name);ui.label(if i.visible{"Visível no viewport"}else{"Oculta no viewport"});ui.label(RichText::new(self.selection_path()).size(10.).color(p.secondary));}else if let Some(g)=group{ui.colored_label(p.primary,"MONTAGEM SELECIONADA");ui.strong(&g.name);ui.label(RichText::new(self.selection_path()).size(10.).color(p.secondary));}else{ui.strong("Nenhum objeto selecionado");ui.label("Selecione na estrutura ou clique na geometria.");}});
+            ui.horizontal(|ui|{for(tab,label)in["Objeto","Análise","Ações"].iter().enumerate(){ui.selectable_value(&mut self.inspector_tab,tab,*label);}});ui.separator();
+            egui::ScrollArea::vertical().id_salt(("inspector_body",self.inspector_tab)).show(ui,|ui|{ui.add_enabled_ui(self.pending.is_none(),|ui|{match self.inspector_tab{
+                0=>{if self.blast.is_some(){ui.label("Fragmentação ativa. Restaure para editar o objeto.");if ui.button("Abrir efeitos").clicked(){self.show_effects=true;}}else{ui.label("Somente o objeto identificado acima será alterado.");self.selection_properties(ui);}},
+                1=>self.inspection_summary(ui),
+                _=>{
+                    let cloud=self.scene.selected.as_ref().and_then(|id|self.scene.items.iter().find(|i|&i.id==id)).is_some_and(|i|matches!(i.geometry.as_ref(),Geometry::Points(_)));
+                    ui.strong("Geometria selecionada");
+                    if ui.add_enabled(cloud,egui::Button::new("Editar / limpar nuvem…")).on_hover_text("Selecionar pontos, recortar, tratar outliers e salvar revisão.").clicked(){if self.cleaning_target().is_none(){let r=self.begin_cleaning();self.notice(r,"Edição de nuvem iniciada.");}self.cleaning.open=true;}
+                    if ui.add_enabled(self.scene.selected.is_some(),egui::Button::new("Enquadrar seleção")).clicked(){let r=self.scene.fit(true);self.notice(r,"Seleção enquadrada.");}
+                    if ui.add_enabled(self.selected_run().is_some(),egui::Button::new("Resultados desta reconstrução…")).clicked(){self.attach_selected_run();}
+                    if ui.add_enabled(self.selected_run().is_some(),egui::Button::new("Gerar superfície desta origem…")).clicked(){self.configure_selected_run();}
+                    if let Some(root)=self.selected_run().filter(|p|p.join("exports/sparse.ply").is_file())&&ui.button("Visualizar nuvem esparsa deste run").clicked(){self.open_result(root,true,false);}
+                    ui.separator();ui.strong("Montagem e apresentação");ui.label("Organize componentes usando Montagem pai, na aba Objeto.");
+                    if ui.button("Desmontar / explosão / estilhaços…").clicked(){self.show_effects=true;}
+                    if ui.button("Alinhamento entre peças…").clicked(){self.open_alignment();}
+                    if ui.button("Criar exemplo de armadura…").clicked(){self.choose(Purpose::ArmourDemo);}
+                    ui.separator();ui.strong("Inspeção e saída");
+                    if ui.button("Medir e anotar…").clicked(){self.show_measurements=true;}
+                    if ui.add_enabled(self.scene.selected.as_ref().is_some_and(|id|self.scene.items.iter().any(|i|&i.id==id)),egui::Button::new("Exportar objeto montado…")).clicked(){self.choose(Purpose::Export);}
+                    if ui.button("Exportar relatório…").clicked(){self.choose(Purpose::ExportMeasurements);}
+                    ui.separator();if ui.button("Configurar reconstrução…").clicked(){self.show_reconstruction=true;self.pipeline_tab=0;}
+if ui.button("Configurações gerais…").clicked(){self.show_general=true;}
+                }
+            }});});
+        });
+    }
+    fn selection_path(&self) -> String {
+        let mut names = Vec::new();
+        let mut parent = self
+            .scene
+            .selected
+            .as_ref()
+            .and_then(|id| {
+                self.scene
+                    .items
+                    .iter()
+                    .find(|i| &i.id == id)
+                    .map(|i| i.parent.as_deref())
+                    .or_else(|| {
+                        self.scene
+                            .assemblies
+                            .iter()
+                            .find(|g| &g.id == id)
+                            .map(|g| g.parent.as_deref())
+                    })
+            })
+            .flatten();
+        for _ in 0..64 {
+            let Some(id) = parent else { break };
+            let Some(g) = self.scene.assemblies.iter().find(|g| g.id == id) else {
+                break;
+            };
+            names.push(g.name.clone());
+            parent = g.parent.as_deref();
+        }
+        names.reverse();
+        if names.is_empty() {
+            "Workspace / raiz".into()
+        } else {
+            format!("Workspace / {}", names.join(" / "))
+        }
     }
     pub(super) fn viewport_toolbar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("viewport_tools")
@@ -368,10 +310,43 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
                         self.left_visible = true;
                         self.maximized = false;
                     }
-                    ui.selectable_value(&mut self.tool, Tool::Select, "Selecionar");
-                    ui.selectable_value(&mut self.tool, Tool::Pan, "Pan");
-                    ui.selectable_value(&mut self.tool, Tool::Orbit, "Órbita");
+                    egui::ComboBox::from_id_salt("viewport_tool")
+                        .selected_text(match self.tool {
+                            Tool::Select => "Selecionar",
+                            Tool::Pan => "Pan",
+                            Tool::Orbit => "Órbita",
+                        })
+                        .width(100.)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.tool, Tool::Select, "Selecionar");
+                            ui.selectable_value(&mut self.tool, Tool::Pan, "Pan");
+                            ui.selectable_value(&mut self.tool, Tool::Orbit, "Órbita");
+                        });
                     ui.separator();
+                    let cloud = self
+                        .scene
+                        .selected
+                        .as_ref()
+                        .and_then(|id| self.scene.items.iter().find(|i| &i.id == id))
+                        .is_some_and(|i| matches!(i.geometry.as_ref(), Geometry::Points(_)));
+                    if cloud
+                        && ui
+                            .button(if self.cleaning_target().is_some() {
+                                "Retomar edição"
+                            } else {
+                                "Editar nuvem"
+                            })
+                            .clicked()
+                    {
+                        if self.cleaning_target().is_none() {
+                            let r = self.begin_cleaning();
+                            self.notice(r, "Edição da nuvem iniciada.");
+                        }
+                        self.cleaning.open = true;
+                    }
+                    if ui.button("Desmontagem…").clicked() {
+                        self.show_effects = true;
+                    }
                     if ui.button("Medir").clicked() {
                         self.restore_blast();
                         self.show_measurements = true;
@@ -404,6 +379,17 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
                         self.fit_view();
                     }
                     ui.menu_button("Exibição…", |ui| {
+                        if ui
+                            .button(if self.maximized {
+                                "Restaurar painéis"
+                            } else {
+                                "Maximizar viewport"
+                            })
+                            .clicked()
+                        {
+                            self.maximized = !self.maximized;
+                            ui.close();
+                        }
                         if ui.checkbox(&mut self.scene.grid, "Grade").changed() {
                             self.dirty = true;
                         }
@@ -418,16 +404,6 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
                             ui.close();
                         }
                     });
-                    if ui
-                        .button(if self.maximized {
-                            "Restaurar painéis"
-                        } else {
-                            "Maximizar"
-                        })
-                        .clicked()
-                    {
-                        self.maximized = !self.maximized;
-                    }
                     if !self.right_visible
                         && !self.maximized
                         && ui.small_button("Inspetor").clicked()
@@ -458,7 +434,9 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
         self.stop_transition();
         self.measure_mode = false;
         self.hover_anchor = None;
-        match if self.blast_detail == 3 {
+        match if self.panel_fragments {
+            blast::Blast::with_panels(&self.scene, self.blast_selected, self.blast_strength)
+        } else if self.blast_detail == 3 {
             blast::Blast::new(&self.scene, self.blast_selected, self.blast_strength)
         } else {
             blast::Blast::with_detail(
@@ -480,38 +458,40 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
                 self.blast = Some(b);
                 self.notice(
                     Ok(()),
-                    &format!("Prévia: {count} estilhaços · dados originais preservados"),
+                    &format!(
+                        "Prévia: {count} {} · dados originais preservados",
+                        if self.panel_fragments {
+                            "painéis"
+                        } else {
+                            "estilhaços"
+                        }
+                    ),
                 );
             }
             Err(e) => self.notice(Err(e), ""),
         }
     }
-    fn blast_controls(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            if ui.selectable_label(self.blast_mode, "Estilhaçar").clicked() {
-                self.blast_mode = true;
-            }
-            if ui
-                .selectable_label(!self.blast_mode, "Componentes")
-                .clicked()
-            {
-                self.blast_mode = false;
-                self.restore_blast();
-            }
-        });
+    pub(super) fn blast_controls(&mut self, ui: &mut egui::Ui) {
         if self.blast_mode {
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut self.panel_fragments, false, "Estilhaços pequenos");
+                ui.selectable_value(&mut self.panel_fragments, true, "Painéis de superfície");
+            });
+            ui.label(if self.panel_fragments{"Agrupa faces originais em placas rígidas; não usa subdivisão fractal. Não cria interior volumétrico."}else{"Estilhaços subdivididos e dispersão radial. Apenas efeito visual."});
             ui.checkbox(&mut self.blast_selected, "Somente seleção");
-            egui::ComboBox::from_id_salt("shard_size")
-                .selected_text(match self.blast_detail {
-                    2 => "Pedaços médios",
-                    4 => "Pedaços muito pequenos",
-                    _ => "Pedaços pequenos",
-                })
-                .show_ui(ui, |ui| {
-                    for (n, label) in [(2, "Médios"), (3, "Pequenos"), (4, "Muito pequenos")] {
-                        ui.selectable_value(&mut self.blast_detail, n, label);
-                    }
-                });
+            ui.add_enabled_ui(!self.panel_fragments, |ui| {
+                egui::ComboBox::from_id_salt("shard_size")
+                    .selected_text(match self.blast_detail {
+                        2 => "Pedaços médios",
+                        4 => "Pedaços muito pequenos",
+                        _ => "Pedaços pequenos",
+                    })
+                    .show_ui(ui, |ui| {
+                        for (n, label) in [(2, "Médios"), (3, "Pequenos"), (4, "Muito pequenos")] {
+                            ui.selectable_value(&mut self.blast_detail, n, label);
+                        }
+                    });
+            });
             ui.label(
                 RichText::new(
                     "O tamanho é aplicado ao clicar Explodir; ajusta-se ao limite de exibição.",
@@ -573,7 +553,15 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
                 {
                     b.playing = false;
                 }
-                ui.label(format!("{} fragmentos visuais", b.count()));
+                ui.label(format!(
+                    "{} {}",
+                    b.count(),
+                    if self.panel_fragments {
+                        "painéis visuais"
+                    } else {
+                        "estilhaços visuais"
+                    }
+                ));
             }
             ui.label(RichText::new("Malhas: estilhaços de superfície. Nuvens: dispersão de pontos. Efeito temporário, sem colisões.").size(10.).color(self.palette().secondary));
         } else {
@@ -619,20 +607,28 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
             }
         }
     }
-    fn selection_properties(&mut self, ui: &mut egui::Ui) {
+    pub(super) fn selection_properties(&mut self, ui: &mut egui::Ui) {
         let palette = self.palette();
         if let Some(id) = self.scene.selected.clone() {
             let item = self.scene.items.iter().position(|i| i.id == id);
             let group = self.scene.assemblies.iter().position(|g| g.id == id);
             let (mut placement, parent) = if let Some(index) = item {
                 let i = &self.scene.items[index];
-                ui.heading(&i.name);
+                ui.strong("Dados e transformação local");
                 let count = match i.geometry.as_ref() {
                     Geometry::Mesh(m) => format!("{} triângulos", m.triangles().len()),
                     Geometry::Points(p) => format!("{} pontos", p.positions().len()),
                 };
                 ui.label(RichText::new(count).color(palette.primary));
-                ui.label(format!("Unidade: {}", i.unit));
+                ui.label(format!(
+                    "Unidade: {}",
+                    match i.unit.as_str() {
+                        "unknown" | "Unknown" => "não definida",
+                        "Metre" => "m",
+                        "Millimetre" => "mm",
+                        other => other,
+                    }
+                ));
                 ui.label(RichText::new(&i.frame).size(10.).color(palette.secondary));
                 (i.placement.clone(), i.parent.clone())
             } else if let Some(index) = group {
@@ -694,6 +690,7 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
                     "Montagem pai atualizada; valores locais preservados.",
                 );
             }
+            ui.label("Montagem pai");
             ui.label(
                 RichText::new("A transformação abaixo é local à montagem pai.")
                     .size(10.)
@@ -769,9 +766,7 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
             });
             if let Some(index) = item {
                 ui.add_space(5.);
-                if ui.button("Exportar peça montada").clicked() {
-                    self.choose(Purpose::Export);
-                }
+
                 let source = &self.scene.sources[self.scene.items[index].source];
                 ui.label(
                     RichText::new(source.path.display().to_string())

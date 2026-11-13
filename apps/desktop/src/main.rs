@@ -11,8 +11,11 @@ mod animation;
 mod blast;
 mod browser;
 mod cleaning;
+mod effects;
 mod jobs;
+mod logs;
 mod metrology;
+mod preferences;
 mod preparation;
 mod reconstruction;
 mod shell;
@@ -26,9 +29,19 @@ enum Replace {
     Session(PathBuf),
     Demo(PathBuf),
     AlignmentKit([PathBuf; 2]),
+    ArmourDemo(PathBuf),
 }
 struct Desktop {
     scene: Scene,
+    preferences: preferences::Preferences,
+    show_general: bool,
+    pipeline_tab: usize,
+    inspector_tab: usize,
+    show_effects: bool,
+    log_step: Option<usize>,
+    log_stream: usize,
+    focus_loaded: bool,
+    edit_loaded: bool,
     preparation: preparation::PreparationUi,
     cleaning: cleaning::CleaningUi,
     alignment: alignment::AlignmentUi,
@@ -70,6 +83,7 @@ struct Desktop {
     blast_selected: bool,
     blast_strength: f64,
     blast_detail: u32,
+    panel_fragments: bool,
     blast_follow: bool,
     wire_overlay: bool,
     module: shell::Module,
@@ -85,20 +99,52 @@ struct Desktop {
     show_clouds: bool,
 }
 impl Desktop {
-    fn new(cc: &eframe::CreationContext<'_>, scene: Scene) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>, mut scene: Scene) -> Self {
+        if scene.selected.is_none() && scene.items.len() == 1 {
+            scene.selected = Some(scene.items[0].id.clone());
+        }
+        let initial_module = if scene.items.is_empty() {
+            shell::Module::Reconstruction
+        } else if scene.assemblies.is_empty() {
+            shell::Module::Inspection
+        } else {
+            shell::Module::Assembly
+        };
         theme::apply(&cc.egui_ctx, scene.view.theme);
         let display_mode = if scene.wireframe {
             shell::DisplayMode::Wire
         } else {
             shell::DisplayMode::Solid
         };
+        let (preferences, pref_error) = preferences::Preferences::load();
+        let reconstruction = jobs::ReconstructionJob::configured(
+            preferences.engine.clone(),
+            preferences.images.clone(),
+            preferences.output.clone(),
+        );
+        let preparation = preparation::PreparationUi::with_parent(
+            preferences.directory(Purpose::PreparationOutput),
+        );
+        let cleaning =
+            cleaning::CleaningUi::with_parent(preferences.directory(Purpose::CleaningOutput));
         Self {
+            preferences,
+            show_general: false,
+            pipeline_tab: 0,
+            inspector_tab: 0,
+            show_effects: false,
+            log_step: None,
+            log_stream: 0,
+            focus_loaded: false,
+            edit_loaded: false,
             scene,
-            preparation: Default::default(),
-            cleaning: Default::default(),
+            preparation,
+            cleaning,
             alignment: Default::default(),
-            message: "Pronto · importe geometria ou explore seu workspace local.".into(),
-            error: false,
+            message: pref_error
+                .clone()
+                .unwrap_or_else(|| "Pronto · importe fotos ou abra um objeto para começar.".into()),
+            error: pref_error.is_some(),
             dirty: false,
             pending: None,
             pending_session: false,
@@ -108,7 +154,7 @@ impl Desktop {
             replace: None,
             confirm_close: false,
             allow_close: false,
-            reconstruction: Default::default(),
+            reconstruction,
             show_reconstruction: false,
             show_logs: false,
             log_text: String::new(),
@@ -131,13 +177,14 @@ impl Desktop {
             measurement_tool: metrology::MeasurementTool::Distance,
             bounds_cache: Default::default(),
             blast: None,
-            blast_mode: true,
+            blast_mode: false,
             blast_selected: false,
             blast_strength: 1.4,
             blast_detail: 3,
+            panel_fragments: false,
             blast_follow: true,
             wire_overlay: false,
-            module: shell::Module::Assembly,
+            module: initial_module,
             tool: shell::Tool::Orbit,
             left_visible: true,
             right_visible: true,
@@ -163,7 +210,7 @@ impl Desktop {
         }
     }
     fn choose(&mut self, purpose: Purpose) {
-        let mut browser = Browser::new(purpose, &self.last_dir);
+        let mut browser = Browser::new(purpose, &self.preferences.directory(purpose));
         if matches!(purpose, Purpose::Export) {
             let mesh = self
                 .scene
@@ -209,7 +256,9 @@ impl Desktop {
             self.display_mode = shell::DisplayMode::Solid;
             self.wire_overlay = false;
             self.scene = Scene::default();
-            self.cleaning = Default::default();
+            self.cleaning = cleaning::CleaningUi::with_parent(
+                self.preferences.directory(Purpose::CleaningOutput),
+            );
             self.anchors.clear();
             self.measure_mode = false;
             self.transition = None;
@@ -222,6 +271,7 @@ impl Desktop {
         std::thread::spawn(move || {
             let result = match action {
                 Replace::Session(p) => session::load(&p),
+                Replace::ArmourDemo(p) => noah_workspace::demo::create_armour(&p),
                 Replace::Demo(p) => noah_workspace::demo::create(&p),
                 Replace::AlignmentKit(paths) => (|| {
                     let mut scene = Scene::default();
@@ -240,7 +290,7 @@ impl Desktop {
         self.error = false;
     }
     fn request_replace(&mut self, action: Replace) {
-        if self.dirty {
+        if self.dirty || self.cleaning_target().is_some() {
             self.replace = Some(action);
         } else {
             self.replace_scene(action);
@@ -252,6 +302,12 @@ impl Desktop {
         } else {
             path.parent().unwrap_or(Path::new(".")).to_path_buf()
         };
+        let dir = if path.is_dir() {
+            path.clone()
+        } else {
+            path.parent().unwrap_or(Path::new(".")).to_path_buf()
+        };
+        self.preferences.remember(purpose, &dir);
         match purpose {
             Purpose::Import | Purpose::Project => self.load_source(path),
             Purpose::OpenSession => self.request_replace(Replace::Session(path)),
@@ -263,13 +319,46 @@ impl Desktop {
                 self.notice(result, "Workspace salvo. Fontes e montagem preservadas.");
             }
             Purpose::Demo => self.request_replace(Replace::Demo(path)),
+            Purpose::ArmourDemo => self.request_replace(Replace::ArmourDemo(path)),
+            Purpose::PreparationOutput => {
+                self.preparation.parent = path;
+                self.notice(
+                    Ok(()),
+                    "Pasta do preparo atualizada. As outras pastas foram mantidas.",
+                );
+            }
+            Purpose::CleaningOutput => {
+                self.cleaning.parent = path;
+                self.notice(Ok(()), "Pasta das revisões de nuvem atualizada.");
+            }
             Purpose::Images => {
+                self.show_reconstruction = true;
+                self.pipeline_tab = 0;
+                self.preferences.images = path.clone();
                 self.reconstruction.images = path;
                 self.reconstruction.source_run = None;
                 self.reconstruction.clean_revision = None;
+                self.notice(
+                    Ok(()),
+                    "Fotografias selecionadas. Confira a configuração no passo 1.",
+                );
             }
-            Purpose::Engine => self.reconstruction.engine = path,
-            Purpose::Output => self.reconstruction.parent = path,
+            Purpose::Engine => {
+                self.preferences.engine = path.clone();
+                self.reconstruction.engine = path;
+                self.notice(
+                    Ok(()),
+                    "Executável COLMAP selecionado e lembrado para as próximas sessões.",
+                );
+            }
+            Purpose::Output => {
+                self.preferences.output = path.clone();
+                self.reconstruction.parent = path;
+                self.notice(
+                    Ok(()),
+                    "Destino da pipeline atualizado. Preparo e limpeza mantêm pastas próprias.",
+                );
+            }
             Purpose::ExportMeasurements => {
                 let result = measurement::export_report(&self.scene, &path);
                 self.notice(result, "Relatório de medições exportado.");
@@ -288,6 +377,7 @@ impl Desktop {
                 );
             }
         }
+        self.save_preferences();
     }
     fn tree(&mut self, ui: &mut egui::Ui, parent: Option<&str>, depth: usize) {
         if depth > 64 {
@@ -322,9 +412,9 @@ impl Desktop {
                     self.dirty = true;
                 }
                 let kind = if matches!(item.geometry.as_ref(), Geometry::Mesh(_)) {
-                    "OBJ"
+                    "Malha"
                 } else {
-                    "PTS"
+                    "Nuvem"
                 };
                 if ui
                     .selectable_label(
@@ -419,7 +509,7 @@ impl Desktop {
             display_painter.text(top+Vec2::new(0.,20.),egui::Align2::LEFT_TOP,format!("{} primitivas na tela",self.shown),FontId::proportional(10.),palette.secondary);
             if self.scene.items.is_empty(){let center=rect.center();display_painter.text(center-Vec2::new(0.,25.),egui::Align2::CENTER_CENTER,"Seu espaço de geometria",FontId::proportional(27.),palette.text);display_painter.text(center+Vec2::new(0.,20.),egui::Align2::CENTER_CENTER,"Importe fotos, uma geometria ou abra seu projeto.",FontId::proportional(13.),palette.secondary);
                 let area=Rect::from_center_size(center+Vec2::new(0.,90.),Vec2::new(350.,85.));
-                ui.scope_builder(egui::UiBuilder::new().max_rect(area),|ui|{ui.vertical_centered(|ui|{if theme::action(ui,"Importar fotos",palette,true).clicked(){self.choose(Purpose::Images);self.module=shell::Module::Capture;self.right_visible=true;}ui.horizontal(|ui|{if ui.button("Abrir geometria").clicked(){self.choose(Purpose::Import);}
+                ui.scope_builder(egui::UiBuilder::new().max_rect(area),|ui|{ui.vertical_centered(|ui|{if theme::action(ui,"Importar fotos",palette,true).clicked(){self.choose(Purpose::Images);self.module=shell::Module::Reconstruction;self.show_reconstruction=true;self.pipeline_tab=0;self.right_visible=true;}ui.horizontal(|ui|{if ui.button("Abrir geometria").clicked(){self.choose(Purpose::Import);}
 if ui.button("Abrir workspace").clicked(){self.choose(Purpose::OpenSession);}});});});
             }
             display_painter.text(rect.left_bottom()+Vec2::new(22.,-24.),egui::Align2::LEFT_BOTTOM,"Arrastar: órbita   •   Direito / Shift: pan   •   Roda: zoom   •   Clique: selecionar",FontId::proportional(10.),palette.secondary);
@@ -451,7 +541,11 @@ impl eframe::App for Desktop {
                 );
             }
         }
+        let was_running = self.reconstruction.worker.is_some();
         self.reconstruction.refresh();
+        if was_running && self.reconstruction.worker.is_none() {
+            self.pipeline_tab = 2;
+        }
         if self.reconstruction.worker.is_some() {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
@@ -468,8 +562,14 @@ impl eframe::App for Desktop {
                                 shell::DisplayMode::Solid
                             };
                             self.alignment = Default::default();
-                            self.cleaning = Default::default();
+                            self.cleaning = cleaning::CleaningUi::with_parent(
+                                self.preferences.directory(Purpose::CleaningOutput),
+                            );
                             self.scene = scene;
+                            let focus = self.focus_loaded;
+                            let edit = self.edit_loaded;
+                            self.focus_loaded = false;
+                            self.edit_loaded = false;
                             ctx.request_repaint();
                             self.transition = None;
                             self.hover_anchor = None;
@@ -477,8 +577,15 @@ impl eframe::App for Desktop {
                             self.measure_mode = false;
                             self.dirty = !self.pending_session;
                             self.notice(Ok(()), "Workspace aberto e verificado.");
+                            if focus {
+                                self.focus_result(edit);
+                            }
                         }
-                        Err(e) => self.notice(Err(e), ""),
+                        Err(e) => {
+                            self.focus_loaded = false;
+                            self.edit_loaded = false;
+                            self.notice(Err(e), "");
+                        }
                     }
                 }
                 Err(mpsc::TryRecvError::Disconnected) => {
@@ -575,20 +682,12 @@ impl eframe::App for Desktop {
         }
         self.preparation_window(ctx);
         self.cleaning_window(ctx);
+        self.general_window(ctx);
+        if self.show_effects {
+            self.effects_window(ctx);
+        }
         if self.show_logs {
-            egui::Window::new("Logs locais da reconstrução")
-                .open(&mut self.show_logs)
-                .default_size([760., 450.])
-                .show(ctx, |ui| {
-                    egui::ScrollArea::both().show(ui, |ui| {
-                        ui.add(
-                            egui::TextEdit::multiline(&mut self.log_text)
-                                .font(egui::TextStyle::Monospace)
-                                .desired_width(720.)
-                                .interactive(false),
-                        );
-                    });
-                });
+            self.logs_window(ctx);
         }
         let mut choice = None;
         if let Some(browser) = &mut self.browser {
@@ -597,7 +696,10 @@ impl eframe::App for Desktop {
                 choice = Some((purpose, path));
             }
             if browser.closed {
+                self.preferences
+                    .remember(browser.purpose, browser.directory());
                 self.browser = None;
+                self.save_preferences();
             }
         }
         if let Some((purpose, path)) = choice {
@@ -622,7 +724,9 @@ impl eframe::App for Desktop {
                 });
         }
         if ctx.input(|i| i.viewport().close_requested())
-            && (self.dirty || self.reconstruction.worker.is_some())
+            && (self.dirty
+                || self.cleaning_target().is_some()
+                || self.reconstruction.worker.is_some())
             && !self.allow_close
         {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);

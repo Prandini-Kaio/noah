@@ -12,6 +12,7 @@ pub enum ThemeMode {
 #[serde(default, deny_unknown_fields)]
 pub struct ViewOptions {
     pub theme: ThemeMode,
+    pub disassembly: crate::disassembly::Options,
     pub rulers: bool,
     pub axes: bool,
     pub annotations: bool,
@@ -25,6 +26,7 @@ impl Default for ViewOptions {
     fn default() -> Self {
         Self {
             theme: ThemeMode::ArcticDark,
+            disassembly: Default::default(),
             rulers: true,
             axes: true,
             annotations: true,
@@ -38,6 +40,7 @@ impl Default for ViewOptions {
 }
 impl ViewOptions {
     pub fn validate(&self) -> Result<()> {
+        self.disassembly.validate()?;
         if self.decimals > 9
             || !self.snap_radius.is_finite()
             || !(3.0..=24.0).contains(&self.snap_radius)

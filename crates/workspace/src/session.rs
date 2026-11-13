@@ -1,4 +1,4 @@
-//! Sessão schema 7 (leitura 1/2/3/4/5/6): referências verificadas, câmera e ajustes de instância.
+//! Sessão schema 8 (leitura 1/2/3/4/5/6/7): referências verificadas, câmera e ajustes de instância.
 use crate::{Camera, Placement, Result, Scene, Source, source_fingerprint};
 use noah_pipeline::{read_bounded, write_new};
 use serde::{Deserialize, Serialize};
@@ -73,7 +73,7 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
         item.validate()?;
     }
     let session = Session {
-        schema_version: 7,
+        schema_version: 8,
         sources: scene.sources.clone(),
         entities: scene
             .items
@@ -109,7 +109,7 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
 }
 pub fn load(path: &Path) -> Result<Scene> {
     let saved: Session = serde_json::from_slice(&read_bounded(path, 4 * 1024 * 1024)?)?;
-    if !matches!(saved.schema_version, 1..=7)
+    if !matches!(saved.schema_version, 1..=8)
         || saved.sources.len() > 32
         || saved.entities.len() > 1000
     {
