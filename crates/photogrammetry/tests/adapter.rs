@@ -224,3 +224,91 @@ fn invalid_surfaces_do_not_mask_sparse_and_poisons_are_not_inferred() {
     );
     assert!(!out.exists());
 }
+
+#[test]
+fn cleaned_model_keeps_ids_and_observation_positions_and_removes_stale_links() {
+    let t = Temp::new();
+    fs::write(t.0.join("cameras.txt"), CAMERAS).unwrap();
+    let images = "1 1 0 0 0 0 0 0 1 0000.jpg\n10 20 1 30 40 2 50 60 3\n2 1 0 0 0 1 0 0 1 0001.jpg\n10 20 1 30 40 2 50 60 3\n";
+    let points =
+        "1 0 0 0 255 0 0 0.1 1 0 2 0\n2 1 0 0 0 255 0 0.1 1 1 2 1\n3 0 1 0 0 0 255 0.1 1 2 2 2\n";
+    fs::write(t.0.join("images.txt"), images).unwrap();
+    fs::write(t.0.join("points3D.txt"), points).unwrap();
+    model::filter_points(&t.0, &[1, 3].into_iter().collect()).unwrap();
+    let r = model::parse(&t.0).unwrap();
+    assert_eq!(r.point_ids, vec![1, 3]);
+    let result = fs::read_to_string(t.0.join("images.txt")).unwrap();
+    assert!(result.contains("10 20 1 30 40 -1 50 60 3"));
+    let result = fs::read_to_string(t.0.join("points3D.txt")).unwrap();
+    assert!(result.contains("1 2 2 2"));
+    assert!(!result.lines().any(|l| l.starts_with("2 ")));
+}
+
+#[test]
+fn clean_revision_derives_surface_with_provenance_and_rejects_tamper() {
+    use noah_photogrammetry::surface::{self, Method};
+    use noah_storage::cloud_revision::{self, SourceRef};
+    let t = Temp::new();
+    let config = setup(&t, "sparse");
+    let root = config.output.clone();
+    let engine = config.engine.clone();
+    let points =
+        "1 0 0 0 255 0 0 0.1 1 0 2 0\n2 1 0 0 0 255 0 0.1 1 1 2 1\n3 0 1 0 0 0 255 0.1 1 2 2 2\n";
+    let images = "1 1 0 0 0 0 0 0 1 0000.jpg\n10 20 1 30 40 2 50 60 3\n2 1 0 0 0 1 0 0 1 0001.jpg\n10 20 1 30 40 2 50 60 3\n";
+    let script = fs::read_to_string(&engine)
+        .unwrap()
+        .replace(&format!("{POINTS:?}"), &format!("{points:?}"))
+        .replace(&format!("{IMAGES:?}"), &format!("{images:?}"));
+    fs::write(&engine, script).unwrap();
+    reconstruct(config).unwrap();
+    let manifest = inspect(&root).unwrap();
+    let hash = noah_pipeline::hash_file(&root.join("run.json"), 64 * 1024 * 1024)
+        .unwrap()
+        .0;
+    let cloud = model::parse(&root.join("model-0")).unwrap().cloud;
+    let source = SourceRef {
+        path: root.clone(),
+        kind: "run".into(),
+        sha256: hash.clone(),
+        item_id: format!("run:{}", manifest.run_id),
+        unit: "unknown".into(),
+        frame: "sfm".into(),
+    };
+    let revision = t.0.join("clean");
+    cloud_revision::create(&revision, source, &cloud, vec![0, 2], vec![]).unwrap();
+    let output = t.0.join("surface");
+    let cfg = |output| surface::Config {
+        source: root.clone(),
+        engine: engine.clone(),
+        output,
+        method: Method::DelaunaySparse,
+        timeout: Duration::from_secs(3),
+    };
+    surface::from_clean_revision(cfg(output.clone()), &revision).unwrap();
+    assert_eq!(
+        model::parse(&output.join("model-0")).unwrap().point_ids,
+        vec![1, 3]
+    );
+    assert!(
+        fs::read_to_string(output.join("model-0/images.txt"))
+            .unwrap()
+            .contains("30 40 -1")
+    );
+    assert_eq!(
+        hash,
+        noah_pipeline::hash_file(&root.join("run.json"), 64 * 1024 * 1024)
+            .unwrap()
+            .0
+    );
+    let m = inspect(&output).unwrap();
+    assert!(
+        m.artifacts
+            .iter()
+            .any(|a| a.kind == "cleaned_sparse_selection")
+    );
+    assert!(!m.steps.iter().any(|s| s.name == "mapping"));
+    fs::write(revision.join("cloud.ply"), b"tampered").unwrap();
+    let bad = t.0.join("rejected");
+    assert!(surface::from_clean_revision(cfg(bad.clone()), &revision).is_err());
+    assert!(!bad.exists());
+}

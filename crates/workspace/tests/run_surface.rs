@@ -122,3 +122,56 @@ fn surface_and_legacy_run_representations_roundtrip_without_retargeting_anchors(
     );
     fs::remove_dir_all(temp).unwrap();
 }
+
+#[test]
+fn clean_revision_and_original_can_coexist_and_session7_reopens_without_remapping() {
+    let root = std::env::temp_dir().join(format!(
+        "noah-revision-workspace-{:032x}",
+        noah_storage::new_id()
+    ));
+    std::fs::create_dir(&root).unwrap();
+    let cloud =
+        noah_geometry::PointCloud::new(vec![[0., 0., 0.], [3., 0., 0.], [99., 0., 0.]], None)
+            .unwrap();
+    let path = root.join("original.ply");
+    std::fs::write(&path, noah_storage::ply::encode(&cloud)).unwrap();
+    let mut scene = noah_workspace::Scene::default();
+    scene.add_source(&path).unwrap();
+    let id = scene.items[0].id.clone();
+    let src = &scene.sources[0];
+    let r = noah_storage::cloud_revision::SourceRef {
+        path: src.path.clone(),
+        kind: "ply".into(),
+        sha256: src.sha256.clone(),
+        item_id: id.clone(),
+        unit: "unknown".into(),
+        frame: "file".into(),
+    };
+    let revision = root.join("clean");
+    noah_storage::cloud_revision::create(&revision, r, &cloud, vec![0, 1], vec![]).unwrap();
+    scene.add_source(&revision).unwrap();
+    assert_eq!(scene.items[0].geometry.positions().len(), 3);
+    assert_eq!(scene.items[1].geometry.positions().len(), 2);
+    assert_ne!(scene.items[0].id, scene.items[1].id);
+    let session = root.join("test.noah.json");
+    noah_workspace::session::save(&scene, &session).unwrap();
+    let loaded = noah_workspace::session::load(&session).unwrap();
+    assert_eq!(
+        loaded.sources[1].kind,
+        noah_workspace::SourceKind::CloudRevision
+    );
+    assert_eq!(loaded.items[0].id, id);
+    assert_eq!(
+        loaded.items[1].geometry.positions(),
+        &[[0., 0., 0.], [3., 0., 0.]]
+    );
+    let mut saved: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&session).unwrap()).unwrap();
+    saved["schema_version"] = 6.into();
+    let old = root.join("invalid.json");
+    std::fs::write(&old, serde_json::to_vec(&saved).unwrap()).unwrap();
+    assert!(noah_workspace::session::load(&old).is_err());
+    std::fs::write(revision.join("cloud.ply"), b"changed").unwrap();
+    assert!(noah_workspace::session::load(&session).is_err());
+    std::fs::remove_dir_all(root).unwrap();
+}

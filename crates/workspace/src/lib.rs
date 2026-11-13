@@ -40,6 +40,7 @@ pub enum SourceKind {
     Project,
     Run,
     RunSurface,
+    CloudRevision,
     Ply,
     Obj,
 }
@@ -148,13 +149,20 @@ impl Scene {
     pub fn add_source(&mut self, path: &Path) -> Result<()> {
         self.add_source_with_surface(path, true)
     }
+    pub fn add_sparse_source(&mut self, path: &Path) -> Result<()> {
+        self.add_source_with_surface(path, false)
+    }
     pub(crate) fn add_source_with_surface(
         &mut self,
         path: &Path,
         prefer_surface: bool,
     ) -> Result<()> {
         let (source, mut items) = load_source_mode(path, self.sources.len(), prefer_surface)?;
-        if self.sources.iter().any(|s| s.path == source.path) {
+        if self
+            .sources
+            .iter()
+            .any(|s| s.path == source.path && s.kind == source.kind)
+        {
             return Err("fonte já aberta nesta sessão".into());
         }
         if self.sources.len() >= 32 || self.items.len() + items.len() > 1000 {
@@ -235,9 +243,13 @@ fn source_fingerprint(path: &Path, kind: &SourceKind) -> Result<String> {
     let file = match kind {
         SourceKind::Project => path.join("project.json"),
         SourceKind::Run | SourceKind::RunSurface => path.join("run.json"),
+        SourceKind::CloudRevision => path.join("cloud-revision.json"),
         _ => path.to_path_buf(),
     };
     Ok(hash_file(&file, 64 * 1024 * 1024)?.0)
+}
+pub fn load_sparse_source(path: &Path, source_index: usize) -> Result<(Source, Vec<Item>)> {
+    load_source_mode(path, source_index, false)
 }
 pub fn load_source(path: &Path, source_index: usize) -> Result<(Source, Vec<Item>)> {
     load_source_mode(path, source_index, true)
@@ -249,7 +261,9 @@ fn load_source_mode(
 ) -> Result<(Source, Vec<Item>)> {
     let path = std::fs::canonicalize(path)?;
     let kind = if path.is_dir() {
-        if path.join("project.json").is_file() {
+        if path.join("cloud-revision.json").is_file() {
+            SourceKind::CloudRevision
+        } else if path.join("project.json").is_file() {
             SourceKind::Project
         } else if path.join("run.json").is_file() {
             SourceKind::Run
@@ -305,6 +319,22 @@ fn load_source_mode(
                     frame: "Destro / Z-up declarado".into(),
                 });
             }
+        }
+        SourceKind::CloudRevision => {
+            let (revision, cloud) = noah_storage::cloud_revision::load(&source.path)?;
+            items.push(Item {
+                id: format!("cloud-revision:{}", revision.id),
+                name: format!("{name} / nuvem limpa"),
+                source: source_index,
+                geometry: Arc::new(Geometry::Points(cloud)),
+                base: Transform::default(),
+                placement: Placement::default(),
+                visible: true,
+                unit: revision.source.unit,
+                frame: revision.source.frame,
+                parent: None,
+                explode_direction: [0.; 3],
+            });
         }
         SourceKind::Run | SourceKind::RunSurface => {
             let m = noah_pipeline::inspect(&source.path)?;

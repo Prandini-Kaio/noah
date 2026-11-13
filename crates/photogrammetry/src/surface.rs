@@ -103,6 +103,13 @@ fn copy_registered(
 }
 /// New run snapshots images/cameras and records parent manifest; never mutates parent.
 pub fn from_run(config: Config) -> Result<()> {
+    derive(config, None)
+}
+/// Continue a sparse run using a verified cleaning revision, with COLMAP track links intact.
+pub fn from_clean_revision(config: Config, revision: &Path) -> Result<()> {
+    derive(config, Some(revision))
+}
+fn derive(config: Config, revision: Option<&Path>) -> Result<()> {
     let m = inspect(&config.source)?;
     if matches!(m.status, Status::Prepared | Status::Running) {
         return Err("aguarde o término do run de origem".into());
@@ -124,6 +131,33 @@ pub fn from_run(config: Config) -> Result<()> {
     if config.method == Method::PoissonDense {
         required(&m, "exports/dense.ply")?;
     }
+    let clean = if let Some(root) = revision {
+        if config.method != Method::DelaunaySparse {
+            return Err("revisão sparse exige Delaunay CPU".into());
+        }
+        let (mut r, _) = noah_storage::cloud_revision::load(root)?;
+        let (source, indices) = noah_storage::cloud_revision::run_selection(root)?;
+        r.source = source;
+        r.kept_indices = indices;
+        if r.source.kind != "run"
+            || fs::canonicalize(&r.source.path)? != fs::canonicalize(&config.source)?
+            || r.source.sha256 != hash_file(&config.source.join("run.json"), 64 * 1024 * 1024)?.0
+            || r.source.item_id != format!("run:{}", m.run_id)
+        {
+            return Err("revisão não pertence à nuvem esparsa deste run".into());
+        }
+        let original = crate::model::parse(&config.source.join(format!("model-{model}")))?;
+        let (_, clean_cloud) = noah_storage::cloud_revision::load(root)?;
+        if noah_geometry::cleaning::subset(&original.cloud, &r.kept_indices)? != clean_cloud {
+            return Err("pontos da revisão não correspondem ao modelo COLMAP".into());
+        }
+        Some((
+            r,
+            read_bounded(&root.join("cloud-revision.json"), 16 * 1024 * 1024)?,
+        ))
+    } else {
+        None
+    };
     let parameters = BTreeMap::from([
         ("mode".into(), "surface_from_run".into()),
         ("surface_method".into(), config.method.name().into()),
@@ -166,6 +200,23 @@ pub fn from_run(config: Config) -> Result<()> {
                 &format!("model-{model}/{file}"),
                 &format!("model-0/{file}"),
             )?;
+        }
+        if let Some((revision, bytes)) = &clean {
+            let original = crate::model::parse(&job.root().join("model-0"))?;
+            let ids = revision
+                .kept_indices
+                .iter()
+                .map(|&i| original.point_ids[i])
+                .collect();
+            let selection = serde_json::json!({"schema_version":1,"original_source":revision.source,"root_point_indices":revision.kept_indices,"point_ids":revision.kept_indices.iter().map(|&i|original.point_ids[i]).collect::<Vec<_>>()});
+            write_new(
+                &job.root().join("cleaning-selected-points.json"),
+                &serde_json::to_vec_pretty(&selection)?,
+            )?;
+            job.artifact("cleaning-selected-points.json", "cleaned_sparse_selection")?;
+            crate::model::filter_points(&job.root().join("model-0"), &ids)?;
+            write_new(&job.root().join("cleaning.json"), bytes)?;
+            job.artifact("cleaning.json", "cloud_cleaning_revision")?;
         }
         let r = crate::model::parse(&job.root().join("model-0"))?;
         export_sparse(&mut job, "0", &r)?;

@@ -37,6 +37,10 @@ fn id(text: &str) -> Result<u128> {
     }
     Ok(u128::from_str_radix(text, 16)?)
 }
+/// SHA-256 of in-memory content, for verified derived inputs.
+pub fn content_sha256(bytes: &[u8]) -> String {
+    digest(bytes)
+}
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
@@ -433,3 +437,5 @@ fn decode_cloud(bytes: &[u8]) -> Result<PointCloud> {
     }
     Ok(PointCloud::new(points, colors)?)
 }
+
+pub mod cloud_revision;

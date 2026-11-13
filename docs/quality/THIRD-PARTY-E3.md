@@ -200,3 +200,7 @@ Revisar novamente para outros alvos/distribuição.
 | zmij | 1.0.23 | MIT |
 | zune-core | 0.5.3 | MIT OR Apache-2.0 OR Zlib |
 | zune-jpeg | 0.5.15 | MIT OR Apache-2.0 OR Zlib |
+
+Atualização v0.9: photogrammetry usa image 0.25.10 diretamente para JPEG/PNG.
+Ativados decoders PNG/JPEG (zune-core/zune-jpeg), versões já presentes no lock;
+textos das licenças acima incluídos no pacote. Sem download/instalação de motor.

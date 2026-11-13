@@ -272,7 +272,7 @@ pub fn export_report(scene: &Scene, path: &std::path::Path) -> Result<()> {
     }
     let transforms = scene.world_transforms(false)?;
     let instances:Vec<_>=scene.items.iter().zip(&transforms).map(|(i,t)|serde_json::json!({"id":i.id,"name":i.name,"source_index":i.source,"parent":i.parent,"world_transform":{"translation":t.translation(),"rotation":t.rotation(),"scale":t.scale()},"frame":i.frame,"source_unit":i.unit})).collect();
-    let report = serde_json::json!({"schema_version":3,"state":"assembled","coordinate_convention":"right_handed_world_xyz; column_vectors; scale_then_rotation_then_translation","metrology_validated":false,"calibration":scene.calibration,"sources":scene.sources,"instances":instances,"assemblies":scene.assemblies,"measurements":entries,"angles":angles,"dimensions":dimensions});
+    let report = serde_json::json!({"schema_version":4,"state":"assembled","coordinate_convention":"right_handed_world_xyz; column_vectors; scale_then_rotation_then_translation","metrology_validated":false,"calibration":scene.calibration,"sources":scene.sources,"instances":instances,"assemblies":scene.assemblies,"measurements":entries,"angles":angles,"dimensions":dimensions});
     noah_pipeline::write_new(path, &serde_json::to_vec_pretty(&report)?)
 }
 

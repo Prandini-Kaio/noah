@@ -26,3 +26,7 @@ Atualização 2026-11-13: superfície CPU implementada e validada com COLMAP rea
 Pacote Linux compilado disponível nas Releases (prévia v0.8); fontes e binário
 são downloads distintos. Sessão 6 lê 1–5, relatório 3. Consulte README.md e
 docs/quality/E2-MALHA-REPORT.md para o estado atual; registros acima são históricos.
+
+Atualização v0.9: preparação/seleção de imagens, limpeza de nuvem e superfície da
+revisão limpa. Sessão 7 lê 1–6; relatório 4. Guia em docs/desktop/PREPARO-LIMPEZA.md;
+relatório atual em docs/quality/PREPARO-LIMPEZA-REPORT.md.

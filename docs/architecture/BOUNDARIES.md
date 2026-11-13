@@ -73,3 +73,11 @@ identidade e âncoras de nuvens antigas. Sessão 6 lê 1–5; relatório 3 inclu
 tipo de fonte. Derivação copia modelos/fotos registrados para novo run sem alterar
 o pai. Delaunay CPU validado; dense CUDA completo continua pendente. O kit agora
 inclui malha real pré-processada, com origem explícita, sem textura ou escala.
+
+## Preparação e limpeza / sessão 7
+Photogrammetry/preparation audita imagens e gera cópias selecionadas; run verifica
+e incorpora preparation.json. Geometry/cleaning faz seleção e vizinhança com kd-tree
+sem I/O. Storage/cloud_revision persiste snapshot/índices/receita com hashes;
+workspace usa fonte CloudRevision e sessão 7 (lê 1–6), relatório 4. Desktop mantém
+prévia/desfazer temporários. Surface filtra novo modelo COLMAP e observações antes
+de restaurar BIN e gerar Delaunay, preservando o pai. Contrato: ADR 0012.

@@ -17,7 +17,9 @@ impl Desktop {
             .filter(|s| {
                 matches!(
                     s.kind,
-                    noah_workspace::SourceKind::Run | noah_workspace::SourceKind::RunSurface
+                    noah_workspace::SourceKind::Run
+                        | noah_workspace::SourceKind::RunSurface
+                        | noah_workspace::SourceKind::CloudRevision
                 )
             })
             .map(|s| s.path.clone())
@@ -31,15 +33,21 @@ impl Desktop {
     let busy=self.reconstruction.worker.is_some();
     ui.add_enabled_ui(!busy,|ui|{
      ui.horizontal_wrapped(|ui|{
-      if ui.button("Usar fotos do kit").clicked(){if let Some(path)=kit_path("pipeline/fotos"){self.reconstruction.images=path;self.reconstruction.source_run=None;self.reconstruction.name=self.reconstruction.available_name("reconstrucao-kit");self.notice(Ok(()),"Fotos selecionadas. Escolha a saída, COLMAP e destino.");}else{self.notice(Err("Kit não encontrado junto ao aplicativo".into()),"");}}
+      if ui.button("Usar fotos do kit").clicked(){if let Some(path)=kit_path("pipeline/fotos"){self.reconstruction.images=path;self.reconstruction.source_run=None;self.reconstruction.clean_revision=None;self.reconstruction.name=self.reconstruction.available_name("reconstrucao-kit");self.notice(Ok(()),"Fotos selecionadas. Escolha a saída, COLMAP e destino.");}else{self.notice(Err("Kit não encontrado junto ao aplicativo".into()),"");}}
       if ui.button("Abrir nuvem pronta").clicked()&&let Some(path)=kit_path("pipeline/sparse-preprocessado.ply"){self.load_source(path);}
       let ready=kit_path("pipeline/superficie-cpu.obj");if ui.add_enabled(ready.is_some(),egui::Button::new("Abrir superfície pronta")).clicked()&&let Some(path)=ready{self.load_source(path);}
      });
      ui.label(RichText::new("Os botões Abrir pronta usam exemplos pré-processados, sem executar o motor.").size(10.).color(p.secondary));
+     if ui.button("Preparar imagens…").clicked(){self.preparation.open=true;}
      ui.separator();
      let existing=self.selected_run();
-     if ui.add_enabled(existing.is_some(),egui::Button::new("Usar run selecionado para gerar malha")).clicked(){self.reconstruction.source_run=existing;self.reconstruction.mesh=true;self.reconstruction.dense=false;self.reconstruction.name=self.reconstruction.available_name("malha");self.notice(Ok(()),"Run original selecionado. A malha será gerada em novo diretório, sem repetir SfM.");}
-     if let Some(source)=self.reconstruction.source_run.clone(){ui.label(format!("Origem: {}",source.display()));if ui.small_button("Voltar ao processamento de fotos").clicked(){self.reconstruction.source_run=None;self.reconstruction.name=self.reconstruction.available_name("reconstrucao");}}
+     if ui.add_enabled(existing.as_ref().is_some_and(|p|p.join("exports/sparse.ply").is_file()),egui::Button::new("Abrir nuvem esparsa do run selecionado")).clicked()&&let Some(path)=existing.clone(){self.load_sparse_source(path);}
+     if ui.add_enabled(existing.is_some(),egui::Button::new("Usar run selecionado para gerar malha")).clicked()&&let Some(path)=existing {
+       let selected: noah_pipeline::Result<(PathBuf,Option<PathBuf>)>=if path.join("cloud-revision.json").is_file(){noah_storage::cloud_revision::run_selection(&path).map(|(source,_)|(source.path,Some(path)))}else{Ok((path,None))};
+       match selected{Ok((source,revision))=>{self.reconstruction.source_run=Some(source);self.reconstruction.clean_revision=revision;self.reconstruction.mesh=true;self.reconstruction.dense=false;self.reconstruction.name=self.reconstruction.available_name("malha");self.notice(Ok(()),"Origem selecionada. Superfície em novo run, sem repetir SfM.");},Err(e)=>self.notice(Err(e),"")}
+     }
+     if let Some(source)=self.reconstruction.source_run.clone(){ui.label(format!("Origem: {}",source.display()));if let Some(r)=&self.reconstruction.clean_revision{ui.label(format!("Revisão limpa: {}",r.display()));}
+if ui.small_button("Voltar ao processamento de fotos").clicked(){self.reconstruction.source_run=None;self.reconstruction.clean_revision=None;self.reconstruction.name=self.reconstruction.available_name("reconstrucao");}}
      else{ui.horizontal_wrapped(|ui|{if ui.button("Escolher fotografias").clicked(){self.choose(Purpose::Images);}ui.label(self.reconstruction.images.display().to_string());});}
      ui.horizontal_wrapped(|ui|{if ui.button("Escolher COLMAP").clicked(){self.choose(Purpose::Engine);}ui.label(self.reconstruction.engine.display().to_string());});
      ui.horizontal_wrapped(|ui|{if ui.button("Pasta de resultados").clicked(){self.choose(Purpose::Output);}ui.label(self.reconstruction.parent.display().to_string());});
@@ -65,7 +73,7 @@ impl Desktop {
     let output=self.reconstruction.output.clone();
     let mesh=self.reconstruction.has_artifact("exports/mesh.obj")&&self.reconstruction.has_artifact("exports/mesh.metadata.json");
     if ui.add_enabled(mesh,egui::Button::new("Abrir malha no workspace")).clicked()&&let Some(root)=output.clone(){self.load_source(root);}
-    for (file,label) in [("exports/sparse.ply","Abrir esparsa"),("exports/dense-view.ply","Abrir densa")]{if ui.add_enabled(self.reconstruction.has_artifact(file),egui::Button::new(label)).clicked()&&let Some(root)=output.clone(){self.load_source(root.join(file));}}
+    for (file,label) in [("exports/sparse.ply","Abrir esparsa"),("exports/dense-view.ply","Abrir densa")]{if ui.add_enabled(self.reconstruction.has_artifact(file),egui::Button::new(label)).clicked()&&let Some(root)=output.clone(){if file=="exports/sparse.ply"{self.load_sparse_source(root);}else{self.load_source(root.join(file));}}}
    });ui.label(RichText::new("Falhas preservam resultados parciais válidos. Malha não é sólido CAD ou medição validada.").size(10.).color(p.secondary));
   });
         self.show_reconstruction = open;
