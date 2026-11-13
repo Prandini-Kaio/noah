@@ -13,7 +13,7 @@ fotogrametria e explorar resultados em um workspace desktop.
 | E4 — Medições iniciais | Distâncias, ângulos ABC, dimensões XYZ, escala, anotações e relatórios; sem validação metrológica |
 | Recorte E5 — Montagens | Hierarquia, alinhamento translacional por vértices, exemplo e explosão reversível |
 
-Snapshot de desenvolvimento: 67 testes passaram em Linux x86_64. O resultado
+Snapshot de desenvolvimento: 79 testes passaram em Linux x86_64. O resultado
 esparso incluído contém 7.592 pontos. Não são prometidas precisão metrológica,
 compatibilidade universal de formatos ou execução gráfica em todos os sistemas.
 
@@ -131,6 +131,28 @@ O renderer inicial usa projeção CPU e desenho OpenGL/egui, ordenação aproxim
 por profundidade e amostra de até 50 mil pontos/20 mil faces. Não possui z-buffer
 3D, edição topológica ou CAD.
 
+## Preparação e limpeza — prévia v0.9
+
+**Reconstrução → Preparar imagens…** analisa detalhe/desfoque possível, exposição,
+resolução e duplicatas exatas. Revise a seleção e salve um preparo em pasta nova.
+É possível manter os arquivos originais ou redimensionar proporcionalmente para
+PNG; o pipeline passa a usar essas cópias e registra sua proveniência. Avisos são
+heurísticos, sem exclusão automática. Sem máscara ou correção fotométrica.
+
+**Limpar nuvem… → Editar nuvem selecionada** oferece seleção por retângulo em toda
+a profundidade ou caixa XYZ local, remover/isolar, filtros SOR e por raio, prévia
+em vermelho, comparação e desfazer. **Salvar e abrir revisão limpa** cria outra
+fonte com índices originais, cores, hashes e receita; não muda medidas antigas.
+Até 200 mil pontos. Exemplo: `examples/limpeza/nuvem-com-outliers.ply` (348 pontos,
+5 outliers conhecidos). [Passo a passo](docs/desktop/PREPARO-LIMPEZA.md).
+
+Para a próxima etapa, selecione a revisão limpa de um **run sparse** e use
+**Reconstrução → Usar run selecionado para gerar malha → novo destino → Gerar
+malha do run**. As relações com câmeras/observações são filtradas junto dos
+pontos; o pai fica intacto. PLY isolado pode ser editado, mas não substitui as
+câmeras necessárias ao Delaunay. Se o run já abrir como malha, use **Abrir nuvem
+esparsa do run selecionado**. Sessão 7 lê 1–6; relatório JSON 4.
+
 ## Superfície 3D — prévia v0.8
 
 Em **Reconstrução**, selecione **Malha rápida da esparsa · CPU** para gerar uma
@@ -143,8 +165,8 @@ necessárias; nesse caso é necessário o run original ou reprocessar as fotos.
 **Abrir superfície pronta** carrega um resultado real pré-processado do kit,
 sem executar COLMAP. A malha tem faces e admite wireframe, inspeção e exportação
 OBJ. É uma aproximação sem textura UV, pode incluir fundo/buracos e não é sólido
-CAD. Unidades físicas e precisão permanecem desconhecidas. Sessão 6 lê 1–5 e
-preserva as fontes antigas como nuvens; relatório JSON passa a versão 3.
+CAD. Unidades físicas e precisão permanecem desconhecidas. Sessão 7 lê 1–6 e
+preserva as fontes antigas como nuvens; relatório JSON passa a versão 4.
 
 ## Reconstrução com COLMAP
 
@@ -170,7 +192,8 @@ com hardware real nesta entrega. Não há download de dados nem telemetria do NO
 - [Pacote e instruções](LEIA-ME-PACOTE.md)
 - [Relatório E1](docs/quality/E1-REPORT.md)
 - [Relatório E2](docs/quality/E2-REPORT.md)
-- [Superfície CPU — relatório atual](docs/quality/E2-MALHA-REPORT.md)
+- [Preparação, limpeza e superfície limpa — relatório atual](docs/quality/PREPARO-LIMPEZA-REPORT.md)
+- [Superfície CPU — relatório anterior](docs/quality/E2-MALHA-REPORT.md)
 - [Ajustes/E5/kit de pipeline — relatório](docs/quality/E5-KIT-REPORT.md)
 - [E4: ângulos e dimensões — relatório](docs/quality/E4-INSPECAO-REPORT.md)
 - [Estilhaços e layout — relatório](docs/quality/ESTILHACOS-REPORT.md)

@@ -184,3 +184,62 @@ pub fn parse(root: &Path) -> Result<Reconstruction> {
         cloud: PointCloud::new(points, Some(colors))?,
     })
 }
+
+/// Filter COLMAP TXT while preserving point IDs, image observation indices and tracks.
+/// Removed observations become -1; cameras/poses and retained tracks stay unchanged.
+pub fn filter_points(root: &Path, kept_ids: &std::collections::HashSet<u64>) -> Result<()> {
+    let reconstruction = parse(root)?;
+    let all_ids: std::collections::HashSet<_> = reconstruction.point_ids.iter().copied().collect();
+    if kept_ids.is_empty() || !kept_ids.is_subset(&all_ids) {
+        return Err("seleção de pontos não pertence ao modelo".into());
+    }
+    let points = text(root, "points3D.txt")?;
+    let mut out = String::new();
+    for line in points.lines() {
+        if line.starts_with('#') || line.trim().is_empty() {
+            continue;
+        }
+        let id = line
+            .split_whitespace()
+            .next()
+            .ok_or("ponto ausente")?
+            .parse()?;
+        if kept_ids.contains(&id) {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    let images = text(root, "images.txt")?;
+    let mut lines = images.lines();
+    let mut image_out = String::new();
+    while let Some(line) = lines.next() {
+        if line.starts_with('#') || line.trim().is_empty() {
+            continue;
+        }
+        image_out.push_str(line);
+        image_out.push('\n');
+        let observations = lines.next().ok_or("observações ausentes")?;
+        let f: Vec<_> = observations.split_whitespace().collect();
+        for t in f.as_chunks::<3>().0 {
+            image_out.push_str(t[0]);
+            image_out.push(' ');
+            image_out.push_str(t[1]);
+            image_out.push(' ');
+            if t[2] != "-1" && kept_ids.contains(&t[2].parse()?) {
+                image_out.push_str(t[2]);
+            } else {
+                image_out.push_str("-1");
+            }
+            image_out.push(' ');
+        }
+        image_out.push('\n');
+    }
+    // Only called for a new, unregistered model copy in a new job.
+    std::fs::write(root.join("points3D.txt"), out)?;
+    std::fs::write(root.join("images.txt"), image_out)?;
+    let filtered = parse(root)?;
+    if filtered.point_ids.len() != kept_ids.len() {
+        return Err("modelo filtrado inconsistente".into());
+    }
+    Ok(())
+}

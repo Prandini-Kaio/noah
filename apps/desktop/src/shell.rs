@@ -90,7 +90,9 @@ impl Desktop {
                             ui.checkbox(&mut self.maximized, "Maximizar viewport");
                         });
                         if theme::action(ui, "Salvar", p, false).clicked() {
+                            if self.cleaning_target().is_some(){self.notice(Err("Salve a revisão limpa ou descarte a edição antes de salvar o workspace".into()),"");}else{
                             self.choose(Purpose::SaveSession);
+                            }
                         }
                         let ready = self.reconstruction.ready_inputs();
                         if ui
@@ -324,7 +326,8 @@ impl Desktop {
       self.inspection_summary(ui);
      }else{
       match self.module{
-       Module::Capture=>{ui.heading("Captura");ui.label("Escolha a pasta local de fotografias para o pipeline.");if ui.button("Importar fotos…").clicked(){self.choose(Purpose::Images);}ui.label(self.reconstruction.images.display().to_string());if ui.button("Configurar reconstrução").clicked(){self.show_reconstruction=true;}ui.separator();},
+       Module::Capture=>{ui.heading("Captura");ui.label("Escolha a pasta local de fotografias para o pipeline.");if ui.button("Importar fotos…").clicked(){self.choose(Purpose::Images);}ui.label(self.reconstruction.images.display().to_string());if ui.button("Preparar fotografias…").clicked(){self.preparation.open=true;}
+if ui.button("Configurar reconstrução").clicked(){self.show_reconstruction=true;}ui.separator();},
        Module::Reconstruction=>{ui.heading("Reconstrução");ui.label(&self.reconstruction.status);if ui.button("Configuração e acompanhamento").clicked(){self.show_reconstruction=true;}ui.separator();},
        Module::Export=>{ui.heading("Exportação");ui.label("Exporta a peça no estado montado e preserva os dados originais.");let selected=self.scene.items.iter().any(|i|Some(&i.id)==self.scene.selected.as_ref());if ui.add_enabled(selected,egui::Button::new("Exportar peça montada…")).clicked(){self.choose(Purpose::Export);}
 if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::ExportMeasurements);}ui.separator();},_=>{}
@@ -334,6 +337,7 @@ if ui.button("Relatório de medições…").clicked(){self.choose(Purpose::Expor
        if self.blast.is_some(){ui.label("Prévia temporária ativa. Restaure para editar a seleção.");}else{self.selection_properties(ui);}
       });
       ui.add_space(12.);
+      if ui.button("Limpar nuvem…").clicked(){self.cleaning.open=true;}
       if matches!(self.module,Module::Assembly|Module::Inspection){egui::CollapsingHeader::new("Explosão e estilhaços").default_open(true).show(ui,|ui|self.blast_controls(ui));ui.add_space(12.);}
       egui::CollapsingHeader::new("Visualização").default_open(self.module==Module::Inspection).show(ui,|ui|{
        ui.horizontal(|ui|{for (mode,label) in [(DisplayMode::Solid,"Sólido"),(DisplayMode::Wire,"Arame"),(DisplayMode::Points,"Pontos")]{if ui.selectable_value(&mut self.display_mode,mode,label).changed(){self.scene.wireframe=mode==DisplayMode::Wire;self.dirty=true;}}});

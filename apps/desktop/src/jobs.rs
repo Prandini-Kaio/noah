@@ -12,6 +12,7 @@ pub struct ReconstructionJob {
     pub dense: bool,
     pub mesh: bool,
     pub source_run: Option<PathBuf>,
+    pub clean_revision: Option<PathBuf>,
     pub timeout: u64,
     pub output: Option<PathBuf>,
     pub worker: Option<Receiver<Result<()>>>,
@@ -29,6 +30,7 @@ impl Default for ReconstructionJob {
             dense: false,
             mesh: true,
             source_run: None,
+            clean_revision: None,
             timeout: 600,
             output: None,
             worker: None,
@@ -90,10 +92,14 @@ impl ReconstructionJob {
             return Err("escolha um modo de malha para continuar um run".into());
         }
         let source = self.source_run.clone();
+        let clean = self.clean_revision.clone();
+        if clean.is_some() && self.dense {
+            return Err("revisão esparsa limpa exige malha CPU".into());
+        }
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
             let result = if let Some(source) = source {
-                noah_photogrammetry::surface::from_run(noah_photogrammetry::surface::Config {
+                let config = noah_photogrammetry::surface::Config {
                     source,
                     engine: config.engine,
                     output: config.output,
@@ -103,7 +109,12 @@ impl ReconstructionJob {
                     } else {
                         noah_photogrammetry::surface::Method::DelaunaySparse
                     },
-                })
+                };
+                if let Some(path) = clean {
+                    noah_photogrammetry::surface::from_clean_revision(config, &path)
+                } else {
+                    noah_photogrammetry::surface::from_run(config)
+                }
             } else {
                 noah_photogrammetry::reconstruct(config)
             };

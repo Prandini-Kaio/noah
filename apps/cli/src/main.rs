@@ -12,6 +12,10 @@ validate <projeto>\n\
 export <projeto> <object-id> <novo.ply>\n\
 reconstruct <fotos> <novo-run> --colmap <executável> [--dense] [--mesh] [--timeout <segundos>]\n\
 mesh-from-run <run> <novo-run> --colmap <executável> [--poisson] [--timeout <segundos>]\n\
+photos-audit <fotos>\n\
+photos-prepare <fotos> <novo-preparo> [--max-size <pixels>]\n\
+cloud-clean <fonte.ply-ou-run> <nova-revisao> --sor <k> <sigma> | --radius <raio> <min-vizinhos>\n\
+mesh-from-clean <revisao-limpa> <novo-run> --colmap <executável>\n\
 run-inspect <run>\n\
 run-cancel <run>\n\
 Ângulos em radianos, Euler XYZ; transform substitui a transformação da instância.\n\
@@ -28,6 +32,106 @@ fn run(args: &[String]) -> Result<()> {
         return Ok(());
     }
     match args[0].as_str() {
+        "photos-audit" if args.len() == 2 => {
+            let audit = noah_photogrammetry::preparation::analyze(Path::new(&args[1]))?;
+            println!("{}", serde_json::to_string_pretty(&audit)?);
+        }
+        "photos-prepare" if args.len() == 3 || args.len() == 5 => {
+            let max = if args.len() == 5 {
+                if args[3] != "--max-size" {
+                    return Err("opção inválida".into());
+                }
+                args[4].parse()?
+            } else {
+                0
+            };
+            let audit = noah_photogrammetry::preparation::analyze(Path::new(&args[1]))?;
+            noah_photogrammetry::preparation::prepare(
+                &audit,
+                &vec![true; audit.photos.len()],
+                max,
+                Path::new(&args[2]),
+            )?;
+            println!(
+                "fotos preparadas em {}/images; decisões em preparation.json",
+                args[2]
+            );
+        }
+        "cloud-clean" if args.len() == 6 => {
+            let (source, items) = noah_workspace::load_sparse_source(Path::new(&args[1]), 0)?;
+            if items.len() != 1 {
+                return Err("limpeza CLI requer uma única nuvem".into());
+            }
+            let item = &items[0];
+            let noah_workspace::Geometry::Points(cloud) = item.geometry.as_ref() else {
+                return Err("abra a nuvem sparse do run; fonte com malha não é nuvem".into());
+            };
+            let active = vec![true; cloud.positions().len()];
+            let (remove, recipe) = match args[3].as_str() {
+                "--sor" => {
+                    let k = args[4].parse()?;
+                    let sigma = args[5].parse()?;
+                    (
+                        noah_geometry::cleaning::statistical(cloud, &active, k, sigma)?,
+                        serde_json::json!({"operation":"statistical","k":k,"sigma":sigma}),
+                    )
+                }
+                "--radius" => {
+                    let radius = args[4].parse()?;
+                    let n = args[5].parse()?;
+                    (
+                        noah_geometry::cleaning::radius(cloud, &active, radius, n)?,
+                        serde_json::json!({"operation":"radius","radius":radius,"min_neighbours":n}),
+                    )
+                }
+                _ => return Err("use --sor k sigma ou --radius raio min-vizinhos".into()),
+            };
+            let indices = remove
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &r)| (!r).then_some(i))
+                .collect();
+            let source = noah_storage::cloud_revision::SourceRef {
+                path: source.path,
+                kind: serde_json::to_value(source.kind)?
+                    .as_str()
+                    .ok_or("tipo inválido")?
+                    .into(),
+                sha256: source.sha256,
+                item_id: item.id.clone(),
+                unit: item.unit.clone(),
+                frame: item.frame.clone(),
+            };
+            noah_storage::cloud_revision::create(
+                Path::new(&args[2]),
+                source,
+                cloud,
+                indices,
+                vec![recipe],
+            )?;
+            println!(
+                "revisão salva; {} / {} pontos removidos",
+                remove.iter().filter(|&&v| v).count(),
+                remove.len()
+            );
+        }
+        "mesh-from-clean" if args.len() == 5 && args[3] == "--colmap" => {
+            let (source, _) = noah_storage::cloud_revision::run_selection(Path::new(&args[1]))?;
+            noah_photogrammetry::surface::from_clean_revision(
+                noah_photogrammetry::surface::Config {
+                    source: source.path,
+                    output: args[2].clone().into(),
+                    engine: args[4].clone().into(),
+                    method: noah_photogrammetry::surface::Method::DelaunaySparse,
+                    timeout: std::time::Duration::from_secs(600),
+                },
+                Path::new(&args[1]),
+            )?;
+            println!(
+                "superfície da revisão limpa em {}/exports/mesh.obj",
+                args[2]
+            );
+        }
         "reconstruct" if args.len() >= 5 => {
             if args[3] != "--colmap" {
                 return Err("declare --colmap <executável local>".into());

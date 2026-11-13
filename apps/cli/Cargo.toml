@@ -14,3 +14,6 @@ noah-geometry = { path = "../../crates/geometry" }
 noah-storage = { path = "../../crates/storage" }
 noah-pipeline = { path = "../../crates/pipeline" }
 noah-photogrammetry = { path = "../../crates/photogrammetry" }
+
+noah-workspace = { path = "../../crates/workspace" }
+serde_json = "1"

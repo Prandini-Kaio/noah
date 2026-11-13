@@ -996,6 +996,8 @@ dependencies = [
  "num-traits",
  "png",
  "tiff",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -1302,6 +1304,8 @@ dependencies = [
  "noah-photogrammetry",
  "noah-pipeline",
  "noah-storage",
+ "noah-workspace",
+ "serde_json",
 ]
 
 [[package]]
@@ -1332,6 +1336,7 @@ version = "0.1.0"
 name = "noah-photogrammetry"
 version = "0.1.0"
 dependencies = [
+ "image",
  "noah-core",
  "noah-geometry",
  "noah-pipeline",

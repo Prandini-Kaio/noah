@@ -23,3 +23,6 @@ Em conflitos, **não** ampliar escopo silenciosamente: registrar a divergência.
 
 Continuação E2/superfície: roadmap/E2-MALHA.md (relativo a docs),
 quality/E2-MALHA-REPORT.md e decisions/0011-superficie-e-sessao6.md.
+
+Preparação/limpeza: docs/roadmap/PREPARO-LIMPEZA.md, docs/desktop/PREPARO-LIMPEZA.md,
+docs/quality/PREPARO-LIMPEZA-REPORT.md e ADR 0012.

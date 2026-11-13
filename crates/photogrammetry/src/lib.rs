@@ -25,6 +25,7 @@ fn args(values: &[&str]) -> Vec<String> {
 }
 /// Run independente do schema E1; saída permanece no referencial arbitrário SfM.
 pub fn reconstruct(config: Config) -> Result<()> {
+    let prepared = preparation::provenance(&config.images)?;
     let parameters = BTreeMap::from([
         (
             "mode".into(),
@@ -48,7 +49,24 @@ pub fn reconstruct(config: Config) -> Result<()> {
         parameters,
         config.timeout,
     )?;
-    let result = execute(&mut job, config.dense, config.mesh);
+    let result = (|| -> Result<()> {
+        if let Some(bytes) = prepared {
+            let meta: serde_json::Value = serde_json::from_slice(&bytes)?;
+            let entries = meta["images"].as_array().ok_or("preparo inválido")?;
+            for input in &job.manifest().inputs {
+                if !entries.iter().any(|e| {
+                    e["prepared"].as_str() == Some(&input.original_name)
+                        && e["sha256"].as_str() == Some(&input.sha256)
+                }) {
+                    return Err("preparo alterado durante snapshot".into());
+                }
+            }
+
+            write_new(&job.root().join("preparation.json"), &bytes)?;
+            job.artifact("preparation.json", "image_preparation")?;
+        }
+        execute(&mut job, config.dense, config.mesh)
+    })();
     if let Err(error) = result {
         job.fail(&error.to_string())?;
         return Err(format!("{error}; run preservado em {}", job.root().display()).into());
@@ -278,3 +296,5 @@ pub(crate) fn export_dense_preview(job: &mut Job) -> Result<()> {
     write_new(&root.join("exports/dense-view.ply"), &preview)?;
     job.artifact("exports/dense-view.ply", "dense_point_cloud_preview")
 }
+
+pub mod preparation;

@@ -75,3 +75,12 @@ com COLMAP real e interface. OBJ/PLY, proveniência, sessão 6 e relatório 3.
 67 testes. Poisson CPU verificado isoladamente com normais analíticas; cadeia
 CUDA a partir de fotos continua sem validação real. Textura UV, qualidade de
 superfície, CAD e novos MVPs permanecem pendentes. Ver E2-MALHA-REPORT.md.
+
+## Preparação e limpeza — 2026-11-13
+Escopo autorizado: auditar/selecionar/redimensionar fotografias, editar nuvem,
+prévia de SOR/raio e revisões imutáveis. Próxima etapa autorizada interpretada como
+superfície da revisão sparse limpa, implementada sem repetir SfM. Incremento E2/E3,
+base para refinamento, sem declarar toda E6 (novas capturas/comparação) concluída.
+Sessão 7, relatório 4. Máscaras fotográficas e normalização fotométrica entram no
+backlog explícito; textura, CUDA real, CAD e novos sensores seguem pendentes.
+Plano PREPARO-LIMPEZA.md; evidências ../quality/PREPARO-LIMPEZA-REPORT.md.

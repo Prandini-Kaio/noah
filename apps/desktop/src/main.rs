@@ -10,8 +10,10 @@ mod alignment;
 mod animation;
 mod blast;
 mod browser;
+mod cleaning;
 mod jobs;
 mod metrology;
+mod preparation;
 mod reconstruction;
 mod shell;
 mod theme;
@@ -27,6 +29,8 @@ enum Replace {
 }
 struct Desktop {
     scene: Scene,
+    preparation: preparation::PreparationUi,
+    cleaning: cleaning::CleaningUi,
     alignment: alignment::AlignmentUi,
     message: String,
     error: bool,
@@ -90,6 +94,8 @@ impl Desktop {
         };
         Self {
             scene,
+            preparation: Default::default(),
+            cleaning: Default::default(),
             alignment: Default::default(),
             message: "Pronto · importe geometria ou explore seu workspace local.".into(),
             error: false,
@@ -170,11 +176,22 @@ impl Desktop {
         self.browser = Some(browser);
     }
     fn load_source(&mut self, path: PathBuf) {
+        self.load_source_mode(path, false);
+    }
+    fn load_sparse_source(&mut self, path: PathBuf) {
+        self.load_source_mode(path, true);
+    }
+    fn load_source_mode(&mut self, path: PathBuf, sparse: bool) {
         self.restore_blast();
         let (tx, rx) = mpsc::channel();
         let mut scene = self.scene.clone();
         std::thread::spawn(move || {
-            let result = scene.add_source(&path).map(|()| {
+            let result = (if sparse {
+                scene.add_sparse_source(&path)
+            } else {
+                scene.add_source(&path)
+            })
+            .map(|()| {
                 scene.selected = scene.items.last().map(|i| i.id.clone());
                 scene
             });
@@ -192,6 +209,7 @@ impl Desktop {
             self.display_mode = shell::DisplayMode::Solid;
             self.wire_overlay = false;
             self.scene = Scene::default();
+            self.cleaning = Default::default();
             self.anchors.clear();
             self.measure_mode = false;
             self.transition = None;
@@ -248,6 +266,7 @@ impl Desktop {
             Purpose::Images => {
                 self.reconstruction.images = path;
                 self.reconstruction.source_run = None;
+                self.reconstruction.clean_revision = None;
             }
             Purpose::Engine => self.reconstruction.engine = path,
             Purpose::Output => self.reconstruction.parent = path,
@@ -324,7 +343,7 @@ impl Desktop {
         let palette = self.palette();
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(palette.viewport)).show(ctx,|ui|{
             let (response,painter)=ui.allocate_painter(ui.available_size(),Sense::click_and_drag());let outer=response.rect;let rect=if self.scene.view.rulers{Rect::from_min_max(outer.min+Vec2::splat(viewport_tools::RULER),outer.max)}else{outer};let size=[rect.width() as f64,rect.height() as f64];
-            if response.dragged() && self.pending.is_none(){self.stop_transition();let delta=ctx.input(|i|i.pointer.delta());let pan=self.tool==shell::Tool::Pan||response.dragged_by(egui::PointerButton::Secondary)||response.dragged_by(egui::PointerButton::Middle)||ctx.input(|i|i.modifiers.shift);if pan{self.scene.camera.pan([delta.x as f64,delta.y as f64],size[1]);}else if self.tool==shell::Tool::Orbit{self.scene.camera.orbit([delta.x as f64,delta.y as f64]);}self.dirty=true;}
+            if response.dragged() && self.pending.is_none() && !self.cleaning.rect_mode{self.stop_transition();let delta=ctx.input(|i|i.pointer.delta());let pan=self.tool==shell::Tool::Pan||response.dragged_by(egui::PointerButton::Secondary)||response.dragged_by(egui::PointerButton::Middle)||ctx.input(|i|i.modifiers.shift);if pan{self.scene.camera.pan([delta.x as f64,delta.y as f64],size[1]);}else if self.tool==shell::Tool::Orbit{self.scene.camera.orbit([delta.x as f64,delta.y as f64]);}self.dirty=true;}
             if response.hovered() && self.pending.is_none(){let scroll=ctx.input(|i|i.smooth_scroll_delta.y);if scroll!=0.{self.stop_transition();self.scene.camera.zoom(scroll as f64);self.dirty=true;}}
             if !ctx.wants_keyboard_input()&&ctx.input(|i|i.key_pressed(egui::Key::F)){self.fit_view();}
             let aligning=self.alignment.preview && self.alignment.plan.as_ref().is_some_and(|p|p.is_current(&self.scene));
@@ -346,8 +365,9 @@ impl Desktop {
             let mut primitives=noah_workspace::project(&display_scene,size);
             if self.display_mode==shell::DisplayMode::Points { primitives.retain(|p|p.pixels.len()==1); let transforms=display_scene.world_transforms(true).ok(); if let Some(ts)=transforms { let total:usize=display_scene.items.iter().filter(|i|i.visible && matches!(i.geometry.as_ref(),Geometry::Mesh(_))).map(|i|i.geometry.positions().len()).sum();let stride=total.div_ceil(noah_workspace::DISPLAY_POINTS).max(1);let mut serial=0;for (index,item) in display_scene.items.iter().enumerate().filter(|(_,i)|i.visible && matches!(i.geometry.as_ref(),Geometry::Mesh(_))) {for &p in item.geometry.positions(){let take=serial%stride==0;serial+=1;if take && let Ok(p)=ts[index].apply(p) && let Some(p)=display_scene.camera.project(p,size){primitives.push(noah_workspace::Primitive{item:index,pixels:vec![[p[0],p[1]]],depth:p[2],color:[142,187,210]});}}} } }
             if let Some(blast)=&self.blast {primitives.retain(|p|!blast.targets.contains(&p.item)); primitives.extend(blast.project(&display_scene.camera,size).into_iter().filter(|p|display_scene.items[p.item].visible));}
-            primitives.sort_by(|a,b|b.depth.total_cmp(&a.depth));self.shown=primitives.len();
-            if response.clicked() && self.pending.is_none()&& let Some(pos)=response.interact_pointer_pos() && rect.contains(pos){
+            if let Some(id)=self.cleaning_target(){primitives.retain(|p|display_scene.items[p.item].id!=id);}
+            primitives.sort_by(|a,b|b.depth.total_cmp(&a.depth));self.shown=primitives.len()+self.cleaning_display_count();
+            if response.clicked() && !self.cleaning.rect_mode && self.pending.is_none()&& let Some(pos)=response.interact_pointer_pos() && rect.contains(pos){
                 let point=[(pos.x-rect.left()) as f64,(pos.y-rect.top()) as f64];
                 if aligning{self.notice(Err("Encerre a prévia de alinhamento para selecionar ou medir".into()),"");}
                 else if self.blast.is_some(){self.notice(Err("Restaure o objeto antes de selecionar ou medir; os estilhaços são apenas visuais".into()),"");}
@@ -393,6 +413,7 @@ impl Desktop {
             }
             if self.scene.view.annotations && self.blast.is_none() && !aligning{self.draw_inspection(&display_scene,&display_painter,rect);}
             if aligning{display_painter.text(rect.center_top()+Vec2::new(0.,60.),egui::Align2::CENTER_TOP,"PRÉVIA DE ALINHAMENTO · aplique ou cancele na janela",FontId::proportional(13.),palette.warning);}
+            self.cleaning_viewport(ctx,&response,&display_painter,rect,&display_scene);
             viewport_tools::draw(&painter,&display_scene,outer,rect,palette,response.hover_pos());
             let top=rect.left_top()+Vec2::new(22.,22.);display_painter.text(top,egui::Align2::LEFT_TOP,if display_scene.camera.projection==Projection::Orthographic{"ORTOGRÁFICA · U/V"}else{"PERSPECTIVA"},FontId::proportional(11.),palette.secondary);
             display_painter.text(top+Vec2::new(0.,20.),egui::Align2::LEFT_TOP,format!("{} primitivas na tela",self.shown),FontId::proportional(10.),palette.secondary);
@@ -447,6 +468,7 @@ impl eframe::App for Desktop {
                                 shell::DisplayMode::Solid
                             };
                             self.alignment = Default::default();
+                            self.cleaning = Default::default();
                             self.scene = scene;
                             ctx.request_repaint();
                             self.transition = None;
@@ -551,6 +573,8 @@ impl eframe::App for Desktop {
         if self.show_reconstruction {
             self.reconstruction_window(ctx);
         }
+        self.preparation_window(ctx);
+        self.cleaning_window(ctx);
         if self.show_logs {
             egui::Window::new("Logs locais da reconstrução")
                 .open(&mut self.show_logs)
