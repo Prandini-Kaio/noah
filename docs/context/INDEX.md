@@ -26,3 +26,6 @@ quality/E2-MALHA-REPORT.md e decisions/0011-superficie-e-sessao6.md.
 
 Preparação/limpeza: docs/roadmap/PREPARO-LIMPEZA.md, docs/desktop/PREPARO-LIMPEZA.md,
 docs/quality/PREPARO-LIMPEZA-REPORT.md e ADR 0012.
+
+UX/fluxo/desmontagem: docs/roadmap/UX-FLUXO-DESMONTAGEM.md,
+docs/desktop/UX-GUIA.md, docs/quality/UX-FLUXO-REPORT.md e ADR 0013.

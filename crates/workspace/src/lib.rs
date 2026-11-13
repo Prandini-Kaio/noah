@@ -12,6 +12,7 @@ pub mod alignment;
 pub mod assembly;
 pub mod camera;
 pub mod demo;
+pub mod disassembly;
 pub mod inspection;
 pub mod measurement;
 pub mod view;

@@ -13,7 +13,7 @@ fotogrametria e explorar resultados em um workspace desktop.
 | E4 — Medições iniciais | Distâncias, ângulos ABC, dimensões XYZ, escala, anotações e relatórios; sem validação metrológica |
 | Recorte E5 — Montagens | Hierarquia, alinhamento translacional por vértices, exemplo e explosão reversível |
 
-Snapshot de desenvolvimento: 79 testes passaram em Linux x86_64. O resultado
+Snapshot de desenvolvimento: 85 testes passaram em Linux x86_64. O resultado
 esparso incluído contém 7.592 pontos. Não são prometidas precisão metrológica,
 compatibilidade universal de formatos ou execução gráfica em todos os sistemas.
 
@@ -26,13 +26,26 @@ cd noah
 
 Também é possível baixar em **Code → Download ZIP**.
 
+## Fluxo guiado e apresentação — v0.10
+
+**Reconstruir…** abre Configurar → Processar → Resultados. Configurações gerais
+lembram o motor e as pastas por finalidade, independentemente. Logs são
+selecionáveis/copiáveis; abrir resultado fecha a janela e enquadra a geometria.
+Nuvens podem ser editadas diretamente nos resultados ou na toolbar.
+
+O inspetor tem identidade da seleção e abas fixas Objeto / Análise / Ações.
+Desmontagem fica em ferramenta separada: radial, camadas e armadura progressiva;
+fragmentação oferece estilhaços e painéis rígidos de superfície. O menu Workspace
+inclui uma armadura sintética com 13 peças aninhadas para testar. Sessão 8 lê 1–7;
+relatório 4. [Guia atual](docs/desktop/UX-GUIA.md).
+
 ## Kit de pipeline e alinhamento E5
 
 O pacote inclui **12 imagens sintéticas**, uma nuvem histórica pré-processada e
 duas malhas para alinhamento. Em Reconstrução, **Usar fotos do kit**
 seleciona os dados; indique seu COLMAP 3.11.x e um destino novo. O fluxo esparso
 real foi novamente validado pela CLI e interface com 12/12 imagens registradas.
-Sem COLMAP, **Abrir nuvem pronta** permite testar a inspeção sem reconstruir.
+Sem COLMAP, **Resultados → Exemplos prontos → Visualizar nuvem de exemplo** permite testar a inspeção sem reconstruir.
 
 Em Workspace → Abrir peças de alinhamento do kit → Montagem → Alinhar peças,
 use movel.obj/1 → fixa.obj/2: ΔX=-4 u. cena. Prévia não modifica o conjunto;
@@ -150,22 +163,20 @@ Para a próxima etapa, selecione a revisão limpa de um **run sparse** e use
 **Reconstrução → Usar run selecionado para gerar malha → novo destino → Gerar
 malha do run**. As relações com câmeras/observações são filtradas junto dos
 pontos; o pai fica intacto. PLY isolado pode ser editado, mas não substitui as
-câmeras necessárias ao Delaunay. Se o run já abrir como malha, use **Abrir nuvem
-esparsa do run selecionado**. Sessão 7 lê 1–6; relatório JSON 4.
+câmeras necessárias ao Delaunay. Se o run já abrir como malha, use **Ações → Visualizar nuvem esparsa deste run**. Sessão 8 lê 1–7; relatório JSON 4.
 
 ## Superfície 3D — prévia v0.8
 
 Em **Reconstrução**, selecione **Malha rápida da esparsa · CPU** para gerar uma
 superfície junto da reconstrução. Para continuar uma nuvem já processada, abra o
-**diretório do run**, selecione-o na árvore e escolha **Usar run selecionado para
-gerar malha**. Informe COLMAP 3.11.x, pasta e nome novos; use **Gerar malha do run**
-e depois **Abrir malha no workspace**. Um PLY isolado não contém as câmeras
+**diretório do run**, selecione-o na árvore e escolha **Continuar run/revisão selecionado**. Informe COLMAP 3.11.x, pasta e nome novos; use **Iniciar reconstrução**
+e depois **Resultados → Superfície 3D → Visualizar no workspace**. Um PLY isolado não contém as câmeras
 necessárias; nesse caso é necessário o run original ou reprocessar as fotos.
 
-**Abrir superfície pronta** carrega um resultado real pré-processado do kit,
+**Resultados → Exemplos prontos → Visualizar superfície de exemplo** carrega um resultado real pré-processado do kit,
 sem executar COLMAP. A malha tem faces e admite wireframe, inspeção e exportação
 OBJ. É uma aproximação sem textura UV, pode incluir fundo/buracos e não é sólido
-CAD. Unidades físicas e precisão permanecem desconhecidas. Sessão 7 lê 1–6 e
+CAD. Unidades físicas e precisão permanecem desconhecidas. Sessão 8 lê 1–7 e
 preserva as fontes antigas como nuvens; relatório JSON passa a versão 4.
 
 ## Reconstrução com COLMAP
@@ -192,7 +203,8 @@ com hardware real nesta entrega. Não há download de dados nem telemetria do NO
 - [Pacote e instruções](LEIA-ME-PACOTE.md)
 - [Relatório E1](docs/quality/E1-REPORT.md)
 - [Relatório E2](docs/quality/E2-REPORT.md)
-- [Preparação, limpeza e superfície limpa — relatório atual](docs/quality/PREPARO-LIMPEZA-REPORT.md)
+- [UX, fluxo guiado e desmontagem — relatório atual](docs/quality/UX-FLUXO-REPORT.md)
+- [Preparação, limpeza e superfície limpa — relatório anterior](docs/quality/PREPARO-LIMPEZA-REPORT.md)
 - [Superfície CPU — relatório anterior](docs/quality/E2-MALHA-REPORT.md)
 - [Ajustes/E5/kit de pipeline — relatório](docs/quality/E5-KIT-REPORT.md)
 - [E4: ângulos e dimensões — relatório](docs/quality/E4-INSPECAO-REPORT.md)

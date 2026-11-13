@@ -16,6 +16,7 @@ struct Shard {
 }
 pub struct Blast {
     shards: Vec<Shard>,
+    panels: Option<usize>,
     pub targets: Vec<usize>,
     pub progress: f64,
     pub playing: bool,
@@ -197,6 +198,7 @@ impl Blast {
             .collect();
         Ok(Self {
             shards,
+            panels: None,
             targets,
             progress: 0.,
             playing: true,
@@ -205,6 +207,86 @@ impl Blast {
             frame: None,
             radius,
         })
+    }
+    /// Rigid surface panels: original faces grouped by orientation and local region.
+    pub fn with_panels(
+        scene: &Scene,
+        selected_only: bool,
+        strength: f64,
+    ) -> noah_workspace::Result<Self> {
+        let mut meshes = scene.clone();
+        for item in &mut meshes.items {
+            if !matches!(item.geometry.as_ref(), Geometry::Mesh(_)) {
+                item.visible = false;
+            }
+        }
+        let mut blast = Self::with_detail(&meshes, selected_only, strength, 0)?;
+        let mut groups: std::collections::BTreeMap<(usize, usize, usize, usize), Vec<usize>> =
+            std::collections::BTreeMap::new();
+        let mut bounds = std::collections::BTreeMap::new();
+        for &i in &blast.targets {
+            let mut lo = [f64::INFINITY; 3];
+            let mut hi = [f64::NEG_INFINITY; 3];
+            for s in blast.shards.iter().filter(|s| s.item == i) {
+                for p in &s.vertices {
+                    for a in 0..3 {
+                        lo[a] = lo[a].min(p[a]);
+                        hi[a] = hi[a].max(p[a]);
+                    }
+                }
+            }
+            bounds.insert(i, (lo, hi));
+        }
+        for (i, s) in blast.shards.iter().enumerate() {
+            let n = cross(
+                sub(s.vertices[1], s.vertices[0]),
+                sub(s.vertices[2], s.vertices[0]),
+            );
+            let axis = (0..3)
+                .max_by(|&a, &b| n[a].abs().total_cmp(&n[b].abs()))
+                .unwrap_or(0);
+            let (lo, hi) = bounds[&s.item];
+            let center: [f64; 3] = std::array::from_fn(|a| (lo[a] + hi[a]) * 0.5);
+            let face = axis * 2 + usize::from(s.center[axis] >= center[axis]);
+            let cell = |a: usize| {
+                if matches!(meshes.items[s.item].geometry.as_ref(),Geometry::Mesh(m) if m.triangles().len()<=48)
+                {
+                    return 0;
+                }
+                (((s.center[a] - lo[a]) / (hi[a] - lo[a]).max(1e-12) * 2.)
+                    .floor()
+                    .clamp(0., 1.)) as usize
+            };
+            groups
+                .entry((s.item, face, cell((axis + 1) % 3), cell((axis + 2) % 3)))
+                .or_default()
+                .push(i);
+        }
+        for (seed, indices) in groups.values().enumerate() {
+            let mut center = [0.; 3];
+            let mut count = 0.;
+            for &i in indices {
+                for &p in &blast.shards[i].vertices {
+                    center = add(center, p);
+                    count += 1.;
+                }
+            }
+            center = mul(center, 1. / count);
+            let item = blast.shards[indices[0]].item;
+            let (lo, hi) = bounds[&item];
+            let origin = mul(add(lo, hi), 0.5);
+            let velocity = mul(unit(sub(center, origin)), blast.radius * 1.6);
+            let axis = unit(std::array::from_fn(|a| noise(seed, a)));
+            for &i in indices {
+                let s = &mut blast.shards[i];
+                s.center = center;
+                s.velocity = velocity;
+                s.axis = axis;
+                s.spin = noise(seed, 5) * 0.45;
+            }
+        }
+        blast.panels = Some(groups.len());
+        Ok(blast)
     }
     pub fn follow_camera(&mut self, camera: &Camera) {
         let old = self.progress;
@@ -247,7 +329,7 @@ impl Blast {
         Ok(())
     }
     pub fn count(&self) -> usize {
-        self.shards.len()
+        self.panels.unwrap_or(self.shards.len())
     }
     pub fn tick(&mut self, dt: f64) {
         if self.playing {
@@ -478,5 +560,40 @@ mod detail_tests {
         assert!(fine.camera().unwrap().distance > s.camera.distance);
         assert!(Blast::with_detail(&s, false, f64::NAN, 3).is_err());
         assert!(Blast::with_detail(&s, false, 1., 5).is_err());
+    }
+}
+
+#[cfg(test)]
+mod panel_tests {
+    use super::*;
+    #[test]
+    fn panels_use_original_faces_coherent_motion_and_exact_restore() {
+        let mut s = Scene::default();
+        s.add_source(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/datasets/inspection-box.obj"),
+        )
+        .unwrap();
+        let before = s.items[0].geometry.positions().to_vec();
+        let mut b = Blast::with_panels(&s, false, 1.).unwrap();
+        let Geometry::Mesh(m) = s.items[0].geometry.as_ref() else {
+            panic!()
+        };
+        assert_eq!(b.shards.len(), m.triangles().len());
+        assert_eq!(b.count(), 6);
+        assert!(b.shards.iter().all(|s| s.vertices.len() == 3));
+        let original: Vec<_> = b.shards.iter().map(|s| b.vertices(s)).collect();
+        b.progress = 1.;
+        assert!(
+            b.shards
+                .iter()
+                .zip(&original)
+                .any(|(s, v)| b.vertices(s) != *v)
+        );
+        b.progress = 0.;
+        for (s, v) in b.shards.iter().zip(original) {
+            assert_eq!(b.vertices(s), v);
+        }
+        assert_eq!(s.items[0].geometry.positions(), before);
     }
 }

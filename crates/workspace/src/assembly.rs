@@ -114,7 +114,15 @@ impl Scene {
             }
             transforms.push(t);
         }
-        if exploded && self.explosion > 0. && !self.items.is_empty() {
+        if exploded
+            && self.explosion > 0.
+            && self.view.disassembly.mode != crate::disassembly::Mode::Radial
+        {
+            let offsets = crate::disassembly::offsets(self, &transforms)?;
+            for (t, offset) in transforms.iter_mut().zip(offsets) {
+                *t = Transform::new(offset, 0., 1.)?.compose(t)?;
+            }
+        } else if exploded && self.explosion > 0. && !self.items.is_empty() {
             let mut min = [f64::INFINITY; 3];
             let mut max = [f64::NEG_INFINITY; 3];
             let mut centers = Vec::new();

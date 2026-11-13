@@ -1,3 +1,11 @@
+# Atualização da interface v0.10
+O fluxo atual usa Configurar / Processar / Resultados. **Abrir esparsa/malha**
+passou a **Resultados → Visualizar no workspace**; **Usar run selecionado** passou
+a **Continuar run/revisão selecionado** no passo 1; **Gerar malha do run** passou a
+**Iniciar reconstrução**. Configurar COLMAP fica em **Configurações gerais**.
+Edição também pelo cartão do resultado e toolbar. Sessão atual 8 lê 1–7;
+relatório 4. [Guia atual](UX-GUIA.md). Os algoritmos e cuidados abaixo permanecem.
+
 # Preparar imagens, limpar nuvem e gerar superfície
 
 ## 1. Preparar fotografias

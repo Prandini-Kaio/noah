@@ -184,7 +184,7 @@ fn session5_report2_and_legacy_keep_identity_methods_and_transforms() {
     assert!(json["angles"][0]["uncertainty"].is_null());
     assert!(measurement::export_report(&s, &report).is_err());
     let mut saved: serde_json::Value = serde_json::from_slice(&fs::read(&p).unwrap()).unwrap();
-    assert_eq!(saved["schema_version"], 7);
+    assert_eq!(saved["schema_version"], 8);
     saved.as_object_mut().unwrap().remove("angles");
     saved
         .as_object_mut()
