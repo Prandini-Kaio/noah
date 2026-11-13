@@ -92,10 +92,7 @@ impl Desktop {
                         if theme::action(ui, "Salvar", p, false).clicked() {
                             self.choose(Purpose::SaveSession);
                         }
-                        let ready = self.reconstruction.images.is_dir()
-                            && self.reconstruction.engine.is_file()
-                            && self.reconstruction.parent.is_dir()
-                            && self.reconstruction.worker.is_none();
+                        let ready = self.reconstruction.ready_inputs();
                         if ui
                             .add_enabled(
                                 ready,

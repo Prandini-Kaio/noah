@@ -8,12 +8,12 @@ fotogrametria e explorar resultados em um workspace desktop.
 | Etapa | Estado |
 |---|---|
 | E1 — Fundação | PLY ASCII XYZ/RGB, transformações, projetos persistidos e CLI validados |
-| E2 — Fotogrametria | COLMAP 3.11.x esparso validado com 12 imagens sintéticas; densificação real pendente de CUDA |
+| E2 — Fotogrametria | COLMAP 3.11.x: sparse e superfície Delaunay CPU reais; densificação real pendente de CUDA |
 | E3 — Workspace desktop | Fluxos principais pela interface, reconstrução acompanhada e sessões verificadas |
 | E4 — Medições iniciais | Distâncias, ângulos ABC, dimensões XYZ, escala, anotações e relatórios; sem validação metrológica |
 | Recorte E5 — Montagens | Hierarquia, alinhamento translacional por vértices, exemplo e explosão reversível |
 
-Snapshot de desenvolvimento: 60 testes passaram em Linux x86_64. O resultado
+Snapshot de desenvolvimento: 67 testes passaram em Linux x86_64. O resultado
 esparso incluído contém 7.592 pontos. Não são prometidas precisão metrológica,
 compatibilidade universal de formatos ou execução gráfica em todos os sistemas.
 
@@ -29,7 +29,7 @@ Também é possível baixar em **Code → Download ZIP**.
 ## Kit de pipeline e alinhamento E5
 
 O pacote inclui **12 imagens sintéticas**, uma nuvem histórica pré-processada e
-duas malhas para alinhamento. Em Reconstrução, **Usar fotos do kit incluído**
+duas malhas para alinhamento. Em Reconstrução, **Usar fotos do kit**
 seleciona os dados; indique seu COLMAP 3.11.x e um destino novo. O fluxo esparso
 real foi novamente validado pela CLI e interface com 12/12 imagens registradas.
 Sem COLMAP, **Abrir nuvem pronta** permite testar a inspeção sem reconstruir.
@@ -131,6 +131,21 @@ O renderer inicial usa projeção CPU e desenho OpenGL/egui, ordenação aproxim
 por profundidade e amostra de até 50 mil pontos/20 mil faces. Não possui z-buffer
 3D, edição topológica ou CAD.
 
+## Superfície 3D — prévia v0.8
+
+Em **Reconstrução**, selecione **Malha rápida da esparsa · CPU** para gerar uma
+superfície junto da reconstrução. Para continuar uma nuvem já processada, abra o
+**diretório do run**, selecione-o na árvore e escolha **Usar run selecionado para
+gerar malha**. Informe COLMAP 3.11.x, pasta e nome novos; use **Gerar malha do run**
+e depois **Abrir malha no workspace**. Um PLY isolado não contém as câmeras
+necessárias; nesse caso é necessário o run original ou reprocessar as fotos.
+
+**Abrir superfície pronta** carrega um resultado real pré-processado do kit,
+sem executar COLMAP. A malha tem faces e admite wireframe, inspeção e exportação
+OBJ. É uma aproximação sem textura UV, pode incluir fundo/buracos e não é sólido
+CAD. Unidades físicas e precisão permanecem desconhecidas. Sessão 6 lê 1–5 e
+preserva as fontes antigas como nuvens; relatório JSON passa a versão 3.
+
 ## Reconstrução com COLMAP
 
 Instale COLMAP **3.11.x** separadamente, pelas
@@ -140,6 +155,8 @@ do executável local confiável:
 ```sh
 cargo run --locked -p noah-cli -- reconstruct ./fotos ./novo-run --colmap /caminho/colmap --timeout 600
 cargo run --locked -p noah-cli -- run-inspect ./novo-run
+cargo run --locked -p noah-cli -- mesh-from-run ./novo-run ./nova-malha --colmap /caminho/colmap
+# Ou acrescente --mesh a reconstruct para obter fotos → superfície diretamente.
 ```
 
 O diretório plano de fotos aceita 3–500 JPEG/PNG. O run deve ser novo e registra
@@ -153,7 +170,8 @@ com hardware real nesta entrega. Não há download de dados nem telemetria do NO
 - [Pacote e instruções](LEIA-ME-PACOTE.md)
 - [Relatório E1](docs/quality/E1-REPORT.md)
 - [Relatório E2](docs/quality/E2-REPORT.md)
-- [Ajustes/E5/kit de pipeline — relatório atual](docs/quality/E5-KIT-REPORT.md)
+- [Superfície CPU — relatório atual](docs/quality/E2-MALHA-REPORT.md)
+- [Ajustes/E5/kit de pipeline — relatório](docs/quality/E5-KIT-REPORT.md)
 - [E4: ângulos e dimensões — relatório](docs/quality/E4-INSPECAO-REPORT.md)
 - [Estilhaços e layout — relatório](docs/quality/ESTILHACOS-REPORT.md)
 - [Arctic — relatório](docs/quality/ARCTIC-REPORT.md)

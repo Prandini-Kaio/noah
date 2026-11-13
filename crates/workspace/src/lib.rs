@@ -39,6 +39,7 @@ impl Geometry {
 pub enum SourceKind {
     Project,
     Run,
+    RunSurface,
     Ply,
     Obj,
 }
@@ -145,7 +146,14 @@ impl Default for Scene {
 }
 impl Scene {
     pub fn add_source(&mut self, path: &Path) -> Result<()> {
-        let (source, mut items) = load_source(path, self.sources.len())?;
+        self.add_source_with_surface(path, true)
+    }
+    pub(crate) fn add_source_with_surface(
+        &mut self,
+        path: &Path,
+        prefer_surface: bool,
+    ) -> Result<()> {
+        let (source, mut items) = load_source_mode(path, self.sources.len(), prefer_surface)?;
         if self.sources.iter().any(|s| s.path == source.path) {
             return Err("fonte já aberta nesta sessão".into());
         }
@@ -226,12 +234,19 @@ impl Scene {
 fn source_fingerprint(path: &Path, kind: &SourceKind) -> Result<String> {
     let file = match kind {
         SourceKind::Project => path.join("project.json"),
-        SourceKind::Run => path.join("run.json"),
+        SourceKind::Run | SourceKind::RunSurface => path.join("run.json"),
         _ => path.to_path_buf(),
     };
     Ok(hash_file(&file, 64 * 1024 * 1024)?.0)
 }
 pub fn load_source(path: &Path, source_index: usize) -> Result<(Source, Vec<Item>)> {
+    load_source_mode(path, source_index, true)
+}
+fn load_source_mode(
+    path: &Path,
+    source_index: usize,
+    prefer_surface: bool,
+) -> Result<(Source, Vec<Item>)> {
     let path = std::fs::canonicalize(path)?;
     let kind = if path.is_dir() {
         if path.join("project.json").is_file() {
@@ -254,7 +269,7 @@ pub fn load_source(path: &Path, source_index: usize) -> Result<(Source, Vec<Item
             _ => return Err("abra PLY ASCII, OBJ triangular, pasta E1 ou run E2".into()),
         }
     };
-    let source = Source {
+    let mut source = Source {
         sha256: source_fingerprint(&path, &kind)?,
         path,
         kind,
@@ -291,7 +306,7 @@ pub fn load_source(path: &Path, source_index: usize) -> Result<(Source, Vec<Item
                 });
             }
         }
-        SourceKind::Run => {
+        SourceKind::Run | SourceKind::RunSurface => {
             let m = noah_pipeline::inspect(&source.path)?;
             if matches!(
                 m.status,
@@ -302,15 +317,41 @@ pub fn load_source(path: &Path, source_index: usize) -> Result<(Source, Vec<Item
             if !m.artifacts.iter().any(|a| a.path == "exports/sparse.ply") {
                 return Err("run sem nuvem esparsa registrada".into());
             }
-            let bytes = read_bounded(
-                &source.path.join("exports/sparse.ply"),
-                noah_storage::MAX_PLY_BYTES,
-            )?;
+            let surface = prefer_surface
+                && m.artifacts
+                    .iter()
+                    .any(|a| a.path == "exports/mesh.obj" && a.kind == "surface_mesh_obj")
+                && m.artifacts.iter().any(|a| {
+                    a.path == "exports/mesh.metadata.json" && a.kind == "surface_provenance"
+                });
+            let relative = if surface {
+                "exports/mesh.obj"
+            } else {
+                "exports/sparse.ply"
+            };
+            let bytes = read_bounded(&source.path.join(relative), noah_storage::MAX_PLY_BYTES)?;
+            let geometry = if surface {
+                source.kind = SourceKind::RunSurface;
+                Geometry::Mesh(noah_storage::obj::parse(&bytes)?)
+            } else {
+                Geometry::Points(noah_storage::ply::parse(&bytes)?)
+            };
             items.push(Item {
-                id: format!("run:{}", m.run_id),
-                name: format!("{name} / esparsa"),
+                id: if surface {
+                    format!("run:{}:surface", m.run_id)
+                } else {
+                    format!("run:{}", m.run_id)
+                },
+                name: format!(
+                    "{name} / {}",
+                    if surface {
+                        "superfície sem textura"
+                    } else {
+                        "esparsa"
+                    }
+                ),
                 source: source_index,
-                geometry: Arc::new(Geometry::Points(noah_storage::ply::parse(&bytes)?)),
+                geometry: Arc::new(geometry),
                 base: Transform::default(),
                 placement: Placement::default(),
                 visible: true,

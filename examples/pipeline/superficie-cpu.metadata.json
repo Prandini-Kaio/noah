@@ -1,0 +1,16 @@
+{
+  "face_count": 6516,
+  "frame": "arbitrary-right-handed-sfm",
+  "method": "delaunay_sparse_visibility",
+  "metrology_validated": false,
+  "normalized_obj": "geometry_only; raw PLY attributes preserved",
+  "parent_run": "f7eb7b5e-d5f2-467c-962c-158ed40e6f53",
+  "poisson_depth": null,
+  "poisson_trim": null,
+  "schema_version": 1,
+  "source_run": "3c884fb0-ab88-4b0e-baf4-8821fe03db53",
+  "textured": false,
+  "unit": "unknown",
+  "vertex_count": 3267,
+  "watertight_validated": false
+}

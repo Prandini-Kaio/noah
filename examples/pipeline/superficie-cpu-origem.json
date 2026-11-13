@@ -1,0 +1,33 @@
+{
+  "face_count": 6516,
+  "frame": "arbitrary-right-handed-sfm",
+  "method": "delaunay_sparse_visibility",
+  "metrology_validated": false,
+  "normalized_obj": "geometry_only; raw PLY attributes preserved",
+  "parent_run": "f7eb7b5e-d5f2-467c-962c-158ed40e6f53",
+  "poisson_depth": null,
+  "poisson_trim": null,
+  "schema_version": 1,
+  "source_run": "3c884fb0-ab88-4b0e-baf4-8821fe03db53",
+  "textured": false,
+  "unit": "unknown",
+  "vertex_count": 3267,
+  "watertight_validated": false,
+  "notice": "Pré-processado real COLMAP Delaunay a partir da reconstrução das 12 imagens sintéticas do kit; sem textura ou escala física",
+  "engine_version": "COLMAP 3.11.1 -- Structure-from-Motion and Multi-View Stereo",
+  "input_sha256": {
+    "view-00.png": "8acc6a2a1b9909da5709fedff6003639ff989accace26692e10e619fa7e1796b",
+    "view-01.png": "cc6d7b7462f3ddd74ac5037dd8745b9200b4562d5fa0b81b536b0ccd4d0f7925",
+    "view-02.png": "59290bee12f50194b0f493e3f179148e839607319d8775e9672bfa687f4464a1",
+    "view-03.png": "d3bd95162f7ed0b167a0ca40986f78696a3e6fe4f5c9b91ba126b4557d3d5ec5",
+    "view-04.png": "684dc6e5a063597f40acbd4b21632449e0232a7d3b2b287726c522e91a4d5026",
+    "view-05.png": "cddd9b6559f854e7df0cfd87f63169fd87f36620df063429a9147932debef9c8",
+    "view-06.png": "f0bdb31aaa3132a0e2394f630eeafdad415403637798bb4923435dd9191fe8c0",
+    "view-07.png": "8471b7d990bf16dfd863b991fc08ded8fc5b4aab7b786b3538392a4b004f20d3",
+    "view-08.png": "0c9ff3463d07b0712fa28a4c7a990c4480a63f3478a6ddc8d8c57774272c9571",
+    "view-09.png": "8f17cbf467d95fe24550dab699307cb54834a1a266447eaf00b6b0c7dc80a745",
+    "view-10.png": "ae412b68b33138d5386dc845b5961d310d9931c5b6ac63465425261dccd1dd3a",
+    "view-11.png": "f71f2035fbc93477444ab0c24edf26769cdaa4be361dbf2f9855686ed5ff50a3"
+  },
+  "mesh_obj_sha256": "15e38f51c1af64293b0e7bc9971c2e6834c6ea3c6e93b9bf12e616ab0031d251"
+}

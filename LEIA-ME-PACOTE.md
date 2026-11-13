@@ -20,3 +20,9 @@ F para enquadrar. Seleção por clique ou lista. Ajustes são da sessão e prese
 fontes. Cada gravação exige arquivo novo. Relatórios em docs/quality/.
 O README original de E1/E2 deve ser lido junto ao relatório E3, que atualiza o
 estado mais recente. Não há binários, instalação do COLMAP ou toolchain no ZIP.
+
+Atualização 2026-11-13: superfície CPU implementada e validada com COLMAP real;
+67 testes passaram. Interface inclui derivação de run e malha pronta do kit.
+Pacote Linux compilado disponível nas Releases (prévia v0.8); fontes e binário
+são downloads distintos. Sessão 6 lê 1–5, relatório 3. Consulte README.md e
+docs/quality/E2-MALHA-REPORT.md para o estado atual; registros acima são históricos.
