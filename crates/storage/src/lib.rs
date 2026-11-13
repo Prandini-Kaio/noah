@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub mod colmap_ply;
 pub mod obj;
 pub mod ply;
 pub type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;

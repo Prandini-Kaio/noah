@@ -65,3 +65,11 @@ UI mantém preview/undo temporários, sem alterar assets. Ajustes aplicados pers
 nos Placements da sessão 5. Desktop usa exemplos locais empacotados; reconstrução
 continua via contrato COLMAP existente. Kit não atribui escala nem representa malha
 sintética como derivada da reconstrução. ADR 0010.
+
+## Superfície E2 / sessão 6
+Adapter mantém malha PLY bruta e normalização OBJ com proveniência. Storage
+valida PLY COLMAP limitado; workspace usa RunSurface distinto de Run, preservando
+identidade e âncoras de nuvens antigas. Sessão 6 lê 1–5; relatório 3 inclui novo
+tipo de fonte. Derivação copia modelos/fotos registrados para novo run sem alterar
+o pai. Delaunay CPU validado; dense CUDA completo continua pendente. O kit agora
+inclui malha real pré-processada, com origem explícita, sem textura ou escala.

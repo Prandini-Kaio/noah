@@ -1,4 +1,4 @@
-//! Sessão schema 5 (leitura 1/2/3/4): referências verificadas, câmera e ajustes de instância.
+//! Sessão schema 6 (leitura 1/2/3/4/5): referências verificadas, câmera e ajustes de instância.
 use crate::{Camera, Placement, Result, Scene, Source, source_fingerprint};
 use noah_pipeline::{read_bounded, write_new};
 use serde::{Deserialize, Serialize};
@@ -73,7 +73,7 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
         item.validate()?;
     }
     let session = Session {
-        schema_version: 5,
+        schema_version: 6,
         sources: scene.sources.clone(),
         entities: scene
             .items
@@ -109,18 +109,29 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
 }
 pub fn load(path: &Path) -> Result<Scene> {
     let saved: Session = serde_json::from_slice(&read_bounded(path, 4 * 1024 * 1024)?)?;
-    if !matches!(saved.schema_version, 1..=5)
+    if !matches!(saved.schema_version, 1..=6)
         || saved.sources.len() > 32
         || saved.entities.len() > 1000
     {
         return Err("schema/limites de sessão inválidos".into());
+    }
+    if saved.schema_version < 6
+        && saved
+            .sources
+            .iter()
+            .any(|s| matches!(s.kind, crate::SourceKind::RunSurface))
+    {
+        return Err("representação de superfície exige sessão 6".into());
     }
     let mut scene = Scene::default();
     for source in &saved.sources {
         if !source.path.is_absolute() {
             return Err("sessão exige caminho absoluto de fonte".into());
         }
-        scene.add_source(&source.path)?;
+        scene.add_source_with_surface(
+            &source.path,
+            matches!(source.kind, crate::SourceKind::RunSurface),
+        )?;
         if scene.sources.last() != Some(source) {
             return Err("fonte movida, alterada ou tipo incompatível".into());
         }

@@ -12,6 +12,7 @@ mod blast;
 mod browser;
 mod jobs;
 mod metrology;
+mod reconstruction;
 mod shell;
 mod theme;
 mod viewport_tools;
@@ -173,7 +174,11 @@ impl Desktop {
         let (tx, rx) = mpsc::channel();
         let mut scene = self.scene.clone();
         std::thread::spawn(move || {
-            let _ = tx.send(scene.add_source(&path).map(|()| scene));
+            let result = scene.add_source(&path).map(|()| {
+                scene.selected = scene.items.last().map(|i| i.id.clone());
+                scene
+            });
+            let _ = tx.send(result);
         });
         self.pending = Some(rx);
         self.pending_session = false;
@@ -240,7 +245,10 @@ impl Desktop {
                 self.notice(result, "Workspace salvo. Fontes e montagem preservadas.");
             }
             Purpose::Demo => self.request_replace(Replace::Demo(path)),
-            Purpose::Images => self.reconstruction.images = path,
+            Purpose::Images => {
+                self.reconstruction.images = path;
+                self.reconstruction.source_run = None;
+            }
             Purpose::Engine => self.reconstruction.engine = path,
             Purpose::Output => self.reconstruction.parent = path,
             Purpose::ExportMeasurements => {
@@ -396,37 +404,6 @@ if ui.button("Abrir workspace").clicked(){self.choose(Purpose::OpenSession);}});
             display_painter.text(rect.left_bottom()+Vec2::new(22.,-24.),egui::Align2::LEFT_BOTTOM,"Arrastar: órbita   •   Direito / Shift: pan   •   Roda: zoom   •   Clique: selecionar",FontId::proportional(10.),palette.secondary);
             display_painter.text(rect.right_bottom()-Vec2::new(20.,24.),egui::Align2::RIGHT_BOTTOM,"XYZ do arquivo",FontId::proportional(10.),palette.primary);
         });
-    }
-}
-impl Desktop {
-    fn reconstruction_window(&mut self, ctx: &egui::Context) {
-        let palette = self.palette();
-        let mut open = self.show_reconstruction;
-        egui::Window::new("Fotogrametria local").open(&mut open).default_width(660.).collapsible(false).show(ctx,|ui|{
-   ui.label(RichText::new("Fotografias / Câmeras / Nuvem de pontos").size(18.).strong());ui.label("Escolha um COLMAP 3.11.x instalado localmente. Seus dados permanecem nesta máquina.");ui.separator();
-   let busy=self.reconstruction.worker.is_some();
-   ui.add_enabled_ui(!busy,|ui|{ui.horizontal(|ui|{
-    if ui.button("Usar fotos do kit incluído").clicked(){if let Some(path)=kit_path("pipeline/fotos"){self.reconstruction.images=path;self.reconstruction.name="reconstrucao-kit-001".into();for i in 1..=1000{let name=format!("reconstrucao-kit-{i:03}");if !self.reconstruction.parent.join(&name).exists(){self.reconstruction.name=name;break;}}self.notice(Ok(()),"12 imagens sintéticas selecionadas; configure o COLMAP local e o destino.");}else{self.notice(Err("Kit de fotos não encontrado ao lado do aplicativo".into()),"");}}
-    if ui.button("Abrir nuvem pronta").on_hover_text("Abre um resultado pré-processado; não executa reconstrução").clicked()&&let Some(path)=kit_path("pipeline/sparse-preprocessado.ply"){self.load_source(path);}
-   });});
-   ui.add_enabled_ui(!busy,|ui|{
-    ui.horizontal(|ui|{if ui.button("1. Escolher fotografias").clicked(){self.choose(Purpose::Images);}ui.label(self.reconstruction.images.display().to_string());});
-    ui.horizontal(|ui|{if ui.button("2. Escolher COLMAP").clicked(){self.choose(Purpose::Engine);}ui.label(self.reconstruction.engine.display().to_string());});
-    ui.horizontal(|ui|{if ui.button("3. Pasta de resultados").clicked(){self.choose(Purpose::Output);}ui.label(self.reconstruction.parent.display().to_string());});
-    ui.horizontal(|ui|{ui.label("Nome da reconstrução");ui.text_edit_singleline(&mut self.reconstruction.name);});
-    ui.checkbox(&mut self.reconstruction.dense,"Incluir densificação (requer CUDA e GPU compatível)");ui.horizontal(|ui|{ui.label("Tempo máximo por etapa / segundos");ui.add(egui::DragValue::new(&mut self.reconstruction.timeout).range(1..=86400));});
-    if ui.button(RichText::new("Iniciar reconstrução").color(palette.primary)).clicked(){let result=self.reconstruction.start();self.notice(result,"Reconstrução iniciada. Você pode continuar explorando a cena.");}
-   });
-   ui.separator();if busy{ui.horizontal(|ui|{ui.spinner();ui.label("Processamento em andamento");if ui.button("Cancelar processamento").clicked(){let result=self.reconstruction.cancel();self.notice(result,"Cancelamento solicitado.");}});}
-   ui.label(&self.reconstruction.status);
-   if let Some(manifest)=&self.reconstruction.manifest{ui.label(format!("Estado: {} · {} imagens",jobs::status_label(&manifest.status),manifest.inputs.len()));for step in &manifest.steps{ui.horizontal(|ui|{ui.colored_label(match step.status{noah_pipeline::Status::Succeeded=>palette.success,noah_pipeline::Status::Failed=>palette.error,noah_pipeline::Status::Cancelled=>palette.warning,_=>palette.secondary},jobs::status_label(&step.status));ui.label(jobs::step_label(&step.name));});}}
-   ui.horizontal(|ui|{
-    if ui.button("Ver logs e diagnóstico").clicked(){match self.reconstruction.logs(){Ok(text)=>{self.log_text=text;self.show_logs=true;},Err(e)=>self.notice(Err(e),"")}}
-    let output=self.reconstruction.output.clone();let available=!busy&&output.as_ref().is_some_and(|p|p.join("exports/sparse.ply").is_file());
-    if ui.add_enabled(available,egui::Button::new("Abrir nuvem no workspace")).clicked()&&let Some(root)=output{self.load_source(root);}
-   });ui.label(RichText::new("Falhas e resultados parciais são preservados. As fotos não são alteradas.").size(11.).color(palette.secondary));
-  });
-        self.show_reconstruction = open;
     }
 }
 impl eframe::App for Desktop {

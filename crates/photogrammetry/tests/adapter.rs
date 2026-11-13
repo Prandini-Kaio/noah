@@ -68,11 +68,16 @@ if a==['--help']:
 def option(n):return pathlib.Path(a[a.index(n)+1])
 if a[0]=='mapper' and mode!='missing':
  (option('--output_path')/'0').mkdir()
-if a[0]=='model_converter':
+if a[0]=='model_converter' and a[a.index('--output_type')+1]=='BIN':
+ p=option('--output_path')
+ for name in ['cameras.bin','images.bin','points3D.bin']:(p/name).write_bytes(b'controlled-model')
+if a[0]=='model_converter' and a[a.index('--output_type')+1]=='TXT':
  p=option('--output_path')
  (p/'cameras.txt').write_text({CAMERAS:?})
  (p/'images.txt').write_text({IMAGES:?})
  (p/'points3D.txt').write_text({POINTS:?} if mode!='bad' else 'invalid')
+if a[0] in ['delaunay_mesher','poisson_mesher']:
+ if mode!='no_mesh':option('--output_path').write_text('ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nelement face 1\nproperty list uchar int vertex_indices\nend_header\n0 0 0\n1 0 0\n0 1 0\n3 0 1 '+('99' if mode=='bad_mesh' else '2')+'\n')
 if a[0]=='stereo_fusion':
  header='ply\nformat binary_little_endian 1.0\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nproperty float nx\nproperty float ny\nproperty float nz\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n'
  option('--output_path').write_bytes(header.encode()+struct.pack('<6f3B',1,2,3,0,0,1,255,0,0))
@@ -86,6 +91,7 @@ if a[0]=='stereo_fusion':
         images,
         output: t.0.join("run"),
         dense: mode == "dense",
+        mesh: false,
         timeout: Duration::from_secs(3),
     }
 }
@@ -118,4 +124,103 @@ fn zero_exit_without_valid_outputs_is_failure() {
         assert_eq!(m.status, Status::Failed);
         assert!(m.diagnostic.is_some());
     }
+}
+
+#[test]
+fn surfaces_and_derivations_use_registered_data_and_preserve_parent() {
+    use noah_photogrammetry::surface::{self, Method};
+    for dense in [false, true] {
+        let t = Temp::new();
+        let mut config = setup(&t, if dense { "dense" } else { "sparse" });
+        config.mesh = true;
+        let engine = config.engine.clone();
+        let root = config.output.clone();
+        reconstruct(config).unwrap();
+        let original = fs::read(root.join("run.json")).unwrap();
+        let info: serde_json::Value =
+            serde_json::from_slice(&fs::read(root.join("exports/mesh.metadata.json")).unwrap())
+                .unwrap();
+        assert_eq!(info["face_count"], 1);
+        assert_eq!(info["textured"], false);
+        assert!(
+            inspect(&root)
+                .unwrap()
+                .artifacts
+                .iter()
+                .any(|a| a.path == "exports/mesh.obj")
+        );
+        if dense {
+            let cloud =
+                noah_storage::ply::parse(&fs::read(root.join("exports/dense-view.ply")).unwrap())
+                    .unwrap();
+            assert_eq!(cloud.positions(), &[[1., 2., 3.]]);
+        }
+        let output = t.0.join("derived");
+        surface::from_run(surface::Config {
+            source: root.clone(),
+            output: output.clone(),
+            engine,
+            method: if dense {
+                Method::PoissonDense
+            } else {
+                Method::DelaunaySparse
+            },
+            timeout: Duration::from_secs(3),
+        })
+        .unwrap();
+        let m = inspect(&output).unwrap();
+        assert_eq!(m.status, Status::Succeeded);
+        assert!(
+            !m.steps
+                .iter()
+                .any(|s| s.name == "features" || s.name == "matching" || s.name == "mapping")
+        );
+        assert!(m.steps.iter().any(|s| s.name == "restore_model"));
+        assert!(m.parameters.contains_key("parent_run"));
+        assert_eq!(fs::read(root.join("run.json")).unwrap(), original);
+    }
+}
+#[test]
+fn invalid_surfaces_do_not_mask_sparse_and_poisons_are_not_inferred() {
+    use noah_photogrammetry::surface::{self, Method};
+    for mode in ["no_mesh", "bad_mesh"] {
+        let t = Temp::new();
+        let mut c = setup(&t, mode);
+        c.mesh = true;
+        let out = c.output.clone();
+        reconstruct(c).unwrap_err();
+        let m = inspect(&out).unwrap();
+        assert_eq!(m.status, Status::Failed);
+        assert!(m.artifacts.iter().any(|a| a.path == "exports/sparse.ply"));
+        assert!(!m.artifacts.iter().any(|a| a.path == "exports/mesh.obj"));
+    }
+    let t = Temp::new();
+    let c = setup(&t, "sparse");
+    let root = c.output.clone();
+    let engine = c.engine.clone();
+    reconstruct(c).unwrap();
+    let out = t.0.join("unsupported");
+    assert!(
+        surface::from_run(surface::Config {
+            source: root.clone(),
+            output: out.clone(),
+            engine: engine.clone(),
+            method: Method::PoissonDense,
+            timeout: Duration::from_secs(3)
+        })
+        .is_err()
+    );
+    assert!(!out.exists());
+    fs::write(root.join("model-0/points3D.txt"), "tampered").unwrap();
+    assert!(
+        surface::from_run(surface::Config {
+            source: root,
+            output: out.clone(),
+            engine,
+            method: Method::DelaunaySparse,
+            timeout: Duration::from_secs(3)
+        })
+        .is_err()
+    );
+    assert!(!out.exists());
 }

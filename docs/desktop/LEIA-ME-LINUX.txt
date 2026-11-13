@@ -53,10 +53,10 @@ orientadas nem medições de volume. A explosão não muda os valores montados.
 Incerteza desconhecida; escala e casas decimais não garantem precisão física.
 
 SALVAR E EXPORTAR
-Salvar cria arquivo novo, sessão versão 5 (lê 1-4). Apps antigos não abrem versão 5.
+Salvar cria arquivo novo, sessão versão 6 (lê 1-5). Apps antigos não abrem versão 6.
 As definições de medidas são recalculadas ao reabrir. Fontes usam caminhos
 absolutos: não as mova/apague. A sessão não é um projeto autocontido.
-Exportação de peça usa posição montada; relatório JSON versão 2 contém medidas,
+Exportação de peça usa posição montada; relatório JSON versão 3 contém medidas,
 fontes/hashes, transformações e métodos. Destinos existentes são preservados.
 
 RECONSTRUÇÃO
@@ -73,8 +73,8 @@ Código MIT; exemplos CC0-1.0. Licenças de dependências em third-party-license
 Código e relatórios: https://github.com/Prandini-Kaio/noah
 
 KIT DE PIPELINE E ALINHAMENTO (v0.7)
-Reconstrução > Usar fotos do kit incluído seleciona 12 imagens sintéticas.
-Configure COLMAP 3.11.x local e destino novo; deixe dense desmarcado para CPU.
+Reconstrução > Usar fotos do kit seleciona 12 imagens sintéticas.
+Configure COLMAP 3.11.x local e destino novo; selecione um modo CPU.
 Ao concluir, abra a nuvem, registre medidas, salve/reabra e exporte PLY/relatório.
 Abrir nuvem pronta é apenas inspeção de resultado histórico, sem reconstrução.
 Workspace > Abrir peças de alinhamento do kit fornece malhas sintéticas separadas.
@@ -84,3 +84,17 @@ Arame volta a mostrar arestas sem preenchimento; Sobrepor arestas é separado.
 Estilhaços padrão são menores e se espalham mais; escolha tamanho, força e
 acompanhamento de câmera antes de Explodir. Não alteram fontes nem medidas.
 Guia: examples/pipeline/README.md e examples/alinhamento/README.md.
+
+SUPERFÍCIE 3D (v0.8)
+Reconstrução > Malha rápida da esparsa · CPU gera faces sem CUDA.
+Escolha fotos, COLMAP 3.11.x e novo destino > Iniciar pelas fotos.
+Ao concluir, Abrir malha no workspace. Abrir superfície pronta usa o exemplo
+pré-processado sem executar COLMAP. Para continuar um run antigo, abra sua pasta
+por Workspace > Projeto/run, selecione a fonte e escolha em Reconstrução:
+Usar run selecionado para gerar malha > COLMAP > destino/nome novos > Gerar malha
+do run > Abrir malha no workspace. Um PLY isolado não substitui o run e câmeras.
+Original preservado, derivado rastreado em novo diretório. Delaunay da esparsa é
+aproximado, pode incluir fundo/buracos; sem textura UV, CAD ou precisão garantida.
+Modo denso requer CUDA nas etapas de profundidade; Poisson gera a superfície.
+Esse fluxo denso completo ainda não foi validado com GPU real. Sessões antigas
+continuam abrindo suas nuvens, mesmo quando o run possui uma superfície nova.

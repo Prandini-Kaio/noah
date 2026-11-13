@@ -10,6 +10,8 @@ pub struct ReconstructionJob {
     pub parent: PathBuf,
     pub name: String,
     pub dense: bool,
+    pub mesh: bool,
+    pub source_run: Option<PathBuf>,
     pub timeout: u64,
     pub output: Option<PathBuf>,
     pub worker: Option<Receiver<Result<()>>>,
@@ -25,6 +27,8 @@ impl Default for ReconstructionJob {
             parent: std::env::current_dir().unwrap_or_default(),
             name: "reconstrucao-001".into(),
             dense: false,
+            mesh: true,
+            source_run: None,
             timeout: 600,
             output: None,
             worker: None,
@@ -35,11 +39,33 @@ impl Default for ReconstructionJob {
     }
 }
 impl ReconstructionJob {
+    pub fn ready_inputs(&self) -> bool {
+        self.worker.is_none()
+            && self.engine.is_file()
+            && self.parent.is_dir()
+            && if self.source_run.is_some() {
+                self.mesh
+            } else {
+                self.images.is_dir()
+            }
+    }
+    pub fn available_name(&self, prefix: &str) -> String {
+        for i in 1..=1000 {
+            let s = format!("{prefix}-{i:03}");
+            if !self.parent.join(&s).exists() {
+                return s;
+            }
+        }
+        format!("{prefix}-novo")
+    }
     pub fn start(&mut self) -> Result<()> {
         if self.worker.is_some() {
             return Err("reconstrução já em andamento".into());
         }
-        if !self.images.is_dir() || !self.engine.is_file() || !self.parent.is_dir() {
+        if (!self.images.is_dir() && self.source_run.is_none())
+            || !self.engine.is_file()
+            || !self.parent.is_dir()
+        {
             return Err("escolha fotos, executável COLMAP e pasta de resultados".into());
         }
         if std::path::Path::new(&self.name).components().count() != 1
@@ -57,11 +83,31 @@ impl ReconstructionJob {
             engine: self.engine.clone(),
             output: output.clone(),
             dense: self.dense,
+            mesh: self.mesh,
             timeout: Duration::from_secs(self.timeout),
         };
+        if self.source_run.is_some() && !self.mesh {
+            return Err("escolha um modo de malha para continuar um run".into());
+        }
+        let source = self.source_run.clone();
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
-            let _ = tx.send(noah_photogrammetry::reconstruct(config));
+            let result = if let Some(source) = source {
+                noah_photogrammetry::surface::from_run(noah_photogrammetry::surface::Config {
+                    source,
+                    engine: config.engine,
+                    output: config.output,
+                    timeout: config.timeout,
+                    method: if config.dense {
+                        noah_photogrammetry::surface::Method::PoissonDense
+                    } else {
+                        noah_photogrammetry::surface::Method::DelaunaySparse
+                    },
+                })
+            } else {
+                noah_photogrammetry::reconstruct(config)
+            };
+            let _ = tx.send(result);
         });
         self.worker = Some(rx);
         self.manifest = None;
@@ -69,13 +115,27 @@ impl ReconstructionJob {
         self.status = "Reconstrução em andamento. Acompanhe as etapas abaixo.".into();
         Ok(())
     }
+    pub fn has_artifact(&self, relative: &str) -> bool {
+        self.worker.is_none()
+            && self
+                .output
+                .as_ref()
+                .is_some_and(|p| p.join(relative).is_file())
+            && self
+                .manifest
+                .as_ref()
+                .is_some_and(|m| m.artifacts.iter().any(|a| a.path == relative))
+    }
     pub fn poll(&mut self) {
         if let Some(rx) = &self.worker {
             match rx.try_recv() {
                 Ok(result) => {
                     self.worker = None;
                     self.status = match result {
-                        Ok(()) => "Reconstrução concluída. Abra o resultado no workspace.".into(),
+                        Ok(()) => {
+                            "Processamento concluído. Abra a malha ou a nuvem nos botões abaixo."
+                                .into()
+                        }
                         Err(e) => format!("Reconstrução encerrada: {e}"),
                     };
                 }
@@ -152,6 +212,8 @@ pub fn step_label(name: &str) -> &'static str {
         "undistort" => "Corrigir distorções",
         "patch_match" => "Calcular profundidades",
         "fusion" => "Fundir nuvem densa",
+        "meshing" => "Gerar superfície",
+        "restore_model" => "Reutilizar câmeras e pontos",
         _ => "Exportar modelo",
     }
 }

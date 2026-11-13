@@ -68,3 +68,10 @@ Alinhamento translacional por vértices, prévia e undo guardado implementados; 
 rotação automática/ICP. Imagens sintéticas e malhas de teste incluídas no pacote.
 Pipeline esparso real revalidado pela CLI e GUI com 12/12 imagens; dense/CUDA segue
 pendente. Plano E5-ALINHAMENTO-KIT.md; relatório ../quality/E5-KIT-REPORT.md.
+
+## Continuação — 2026-11-13: superfície E2
+Fotos → superfície Delaunay CPU e derivação de run sem repetir SfM validadas
+com COLMAP real e interface. OBJ/PLY, proveniência, sessão 6 e relatório 3.
+67 testes. Poisson CPU verificado isoladamente com normais analíticas; cadeia
+CUDA a partir de fotos continua sem validação real. Textura UV, qualidade de
+superfície, CAD e novos MVPs permanecem pendentes. Ver E2-MALHA-REPORT.md.

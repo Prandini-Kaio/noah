@@ -7,12 +7,14 @@ use std::{
     time::Duration,
 };
 pub mod model;
+pub mod surface;
 
 pub struct Config {
     pub engine: PathBuf,
     pub images: PathBuf,
     pub output: PathBuf,
     pub dense: bool,
+    pub mesh: bool,
     pub timeout: Duration,
 }
 fn path(path: PathBuf) -> Result<String> {
@@ -26,7 +28,13 @@ pub fn reconstruct(config: Config) -> Result<()> {
     let parameters = BTreeMap::from([
         (
             "mode".into(),
-            if config.dense { "dense" } else { "sparse" }.into(),
+            match (config.dense, config.mesh) {
+                (false, false) => "sparse",
+                (true, false) => "dense",
+                (false, true) => "surface_sparse",
+                (true, true) => "surface_dense",
+            }
+            .into(),
         ),
         ("feature_gpu".into(), "false".into()),
         ("matching_gpu".into(), "false".into()),
@@ -40,24 +48,15 @@ pub fn reconstruct(config: Config) -> Result<()> {
         parameters,
         config.timeout,
     )?;
-    let result = execute(&mut job, config.dense);
+    let result = execute(&mut job, config.dense, config.mesh);
     if let Err(error) = result {
         job.fail(&error.to_string())?;
         return Err(format!("{error}; run preservado em {}", job.root().display()).into());
     }
     Ok(())
 }
-fn execute(job: &mut Job, dense: bool) -> Result<()> {
-    job.step("version", args(&["--help"]))?;
-    let version = String::from_utf8(read_bounded(
-        &job.root().join("logs/00-version.stdout.log"),
-        8 * 1024 * 1024,
-    )?)?;
-    let banner = version
-        .lines()
-        .find(|s| s.contains("COLMAP 3.11"))
-        .ok_or("adaptador requer COLMAP 3.11.x; verifique logs da versão")?;
-    job.set_engine_version(banner.trim().chars().take(4096).collect())?;
+fn execute(job: &mut Job, dense: bool, mesh: bool) -> Result<()> {
+    verify_engine(job)?;
     let root = job.root().to_path_buf();
     let images = path(root.join("images"))?;
     let database = path(root.join("database.db"))?;
@@ -162,23 +161,7 @@ fn execute(job: &mut Job, dense: bool) -> Result<()> {
     {
         return Err("modelo referencia imagem fora do snapshot".into());
     }
-    fs::create_dir(root.join("exports"))?;
-    write_new(
-        &root.join("exports/sparse.ply"),
-        &noah_storage::ply::encode(&reconstruction.cloud),
-    )?;
-    let cameras:Vec<_>=reconstruction.cameras.iter().map(|c|serde_json::json!({"id":c.id,"model":c.model,"width":c.width,"height":c.height,"parameters":c.parameters})).collect();
-    let views:Vec<_>=reconstruction.views.iter().map(|v|serde_json::json!({"id":v.id,"camera_id":v.camera_id,"image_name":v.image_name,"world_to_camera":{"rotation_wxyz":v.rotation_wxyz,"translation":v.translation}})).collect();
-    let export = serde_json::json!({"schema_version":1,"unit":"unknown","frame":"arbitrary-right-handed-sfm","source_run":job.manifest().run_id,"selected_model":name,"input_images":job.manifest().inputs.len(),"registered_images":views.len(),"point_ids":reconstruction.point_ids,"point_count":reconstruction.cloud.positions().len(),"cameras":cameras,"views":views});
-    write_new(
-        &root.join("exports/reconstruction.json"),
-        &serde_json::to_vec_pretty(&export)?,
-    )?;
-    job.artifact("exports/sparse.ply", "sparse_point_cloud")?;
-    job.artifact("exports/reconstruction.json", "cameras_and_poses")?;
-    for file in ["cameras.txt", "images.txt", "points3D.txt"] {
-        job.artifact(&format!("model-{name}/{file}"), "colmap_text_model")?;
-    }
+    export_sparse(job, &name, &reconstruction)?;
     if dense {
         fs::create_dir(root.join("dense"))?;
         let workspace = path(root.join("dense"))?;
@@ -189,7 +172,7 @@ fn execute(job: &mut Job, dense: bool) -> Result<()> {
                 "--image_path",
                 &images,
                 "--input_path",
-                &path(selected)?,
+                &path(selected.clone())?,
                 "--output_path",
                 &workspace,
                 "--output_type",
@@ -227,68 +210,71 @@ fn execute(job: &mut Job, dense: bool) -> Result<()> {
                 "2",
             ]),
         )?;
-        validate_dense(&controlled(&root, "exports/dense.ply")?)?;
-        job.artifact("exports/dense.ply", "dense_point_cloud_colmap")?;
+        export_dense_preview(job)?;
+    }
+    if mesh {
+        surface::mesh(
+            job,
+            if dense {
+                surface::Method::PoissonDense
+            } else {
+                surface::Method::DelaunaySparse
+            },
+            &selected,
+        )?;
     }
     job.succeed()
 }
-/// Verifica envelope do PLY denso binário COLMAP XYZ/normal/RGB (27 bytes/vértice).
-fn validate_dense(path: &Path) -> Result<()> {
-    use std::io::{BufRead, BufReader};
-    let mut reader = BufReader::new(fs::File::open(path)?);
-    let mut header = Vec::new();
-    let mut total = 0;
-    loop {
-        let mut line = String::new();
-        let n = reader.by_ref().take(4097).read_line(&mut line)?;
-        total += n;
-        if n == 0 || n > 4096 || total > 65536 {
-            return Err("header PLY denso inválido".into());
-        }
-        header.push(line.trim_end().to_owned());
-        if line.trim_end() == "end_header" {
-            break;
-        }
-    }
-    let fields: Vec<_> = header
-        .iter()
-        .filter(|s| !s.starts_with("comment "))
-        .map(String::as_str)
-        .collect();
-    if fields.len() != 13
-        || fields[0] != "ply"
-        || fields[1] != "format binary_little_endian 1.0"
-        || fields[3..12]
-            != [
-                "property float x",
-                "property float y",
-                "property float z",
-                "property float nx",
-                "property float ny",
-                "property float nz",
-                "property uchar red",
-                "property uchar green",
-                "property uchar blue",
-            ]
-    {
-        return Err("formato PLY denso COLMAP não suportado".into());
-    }
-    let count: u64 = fields[2]
-        .strip_prefix("element vertex ")
-        .ok_or("contagem PLY denso ausente")?
-        .parse()?;
-    if count == 0 || count > 1_000_000 || fs::metadata(path)?.len() != total as u64 + count * 27 {
-        return Err("contagem/tamanho da nuvem densa inválido".into());
-    }
-    use std::io::Read;
-    let mut vertex = [0u8; 27];
-    for _ in 0..count {
-        reader.read_exact(&mut vertex)?;
-        for field in vertex[..24].as_chunks::<4>().0 {
-            if !f32::from_le_bytes(*field).is_finite() {
-                return Err("coordenada/normal densa não finita".into());
-            }
-        }
+pub(crate) fn verify_engine(job: &mut Job) -> Result<()> {
+    job.step("version", args(&["--help"]))?;
+    let version = String::from_utf8(read_bounded(
+        &job.root().join("logs/00-version.stdout.log"),
+        8 * 1024 * 1024,
+    )?)?;
+    let banner = version
+        .lines()
+        .find(|s| s.contains("COLMAP 3.11"))
+        .ok_or("adaptador requer COLMAP 3.11.x; verifique logs da versão")?;
+    job.set_engine_version(banner.trim().chars().take(4096).collect())?;
+    Ok(())
+}
+pub(crate) fn export_sparse(
+    job: &mut Job,
+    name: &str,
+    reconstruction: &noah_core::reconstruction::Reconstruction,
+) -> Result<()> {
+    let root = job.root().to_path_buf();
+    fs::create_dir(root.join("exports"))?;
+    write_new(
+        &root.join("exports/sparse.ply"),
+        &noah_storage::ply::encode(&reconstruction.cloud),
+    )?;
+    let cameras:Vec<_>=reconstruction.cameras.iter().map(|c|serde_json::json!({"id":c.id,"model":c.model,"width":c.width,"height":c.height,"parameters":c.parameters})).collect();
+    let views:Vec<_>=reconstruction.views.iter().map(|v|serde_json::json!({"id":v.id,"camera_id":v.camera_id,"image_name":v.image_name,"world_to_camera":{"rotation_wxyz":v.rotation_wxyz,"translation":v.translation}})).collect();
+    let export = serde_json::json!({"schema_version":1,"unit":"unknown","frame":"arbitrary-right-handed-sfm","source_run":job.manifest().run_id,"selected_model":name,"input_images":job.manifest().inputs.len(),"registered_images":views.len(),"point_ids":reconstruction.point_ids,"point_count":reconstruction.cloud.positions().len(),"cameras":cameras,"views":views});
+    write_new(
+        &root.join("exports/reconstruction.json"),
+        &serde_json::to_vec_pretty(&export)?,
+    )?;
+    job.artifact("exports/sparse.ply", "sparse_point_cloud")?;
+    job.artifact("exports/reconstruction.json", "cameras_and_poses")?;
+    for file in ["cameras.txt", "images.txt", "points3D.txt"] {
+        job.artifact(&format!("model-{name}/{file}"), "colmap_text_model")?;
     }
     Ok(())
+}
+pub(crate) fn export_dense_preview(job: &mut Job) -> Result<()> {
+    let root = job.root().to_path_buf();
+    let bytes = read_bounded(
+        &controlled(&root, "exports/dense.ply")?,
+        noah_storage::MAX_PLY_BYTES,
+    )?;
+    let cloud = noah_storage::colmap_ply::parse_oriented_cloud(&bytes)?;
+    job.artifact("exports/dense.ply", "dense_point_cloud_colmap")?;
+    let preview = noah_storage::ply::encode(&cloud);
+    if preview.len() as u64 > noah_storage::MAX_PLY_BYTES {
+        return Err("nuvem densa de visualização excede 64 MiB".into());
+    }
+    write_new(&root.join("exports/dense-view.ply"), &preview)?;
+    job.artifact("exports/dense-view.ply", "dense_point_cloud_preview")
 }

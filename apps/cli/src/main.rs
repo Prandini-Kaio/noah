@@ -10,7 +10,8 @@ transform <projeto> <object-id> <tx> <ty> <tz> <rx> <ry> <rz> <escala>\n\
 inspect <projeto>\n\
 validate <projeto>\n\
 export <projeto> <object-id> <novo.ply>\n\
-reconstruct <fotos> <novo-run> --colmap <executável> [--dense] [--timeout <segundos>]\n\
+reconstruct <fotos> <novo-run> --colmap <executável> [--dense] [--mesh] [--timeout <segundos>]\n\
+mesh-from-run <run> <novo-run> --colmap <executável> [--poisson] [--timeout <segundos>]\n\
 run-inspect <run>\n\
 run-cancel <run>\n\
 Ângulos em radianos, Euler XYZ; transform substitui a transformação da instância.\n\
@@ -32,10 +33,15 @@ fn run(args: &[String]) -> Result<()> {
                 return Err("declare --colmap <executável local>".into());
             }
             let mut dense = false;
+            let mut mesh = false;
             let mut timeout = 600u64;
             let mut i = 5;
             while i < args.len() {
                 match args[i].as_str() {
+                    "--mesh" if !mesh => {
+                        mesh = true;
+                        i += 1;
+                    }
                     "--dense" if !dense => {
                         dense = true;
                         i += 1;
@@ -52,9 +58,41 @@ fn run(args: &[String]) -> Result<()> {
                 images: args[1].clone().into(),
                 output: args[2].clone().into(),
                 dense,
+                mesh,
                 timeout: std::time::Duration::from_secs(timeout),
             })?;
             println!("run concluído; exports em {}/exports", args[2]);
+        }
+        "mesh-from-run" if args.len() >= 5 => {
+            if args[3] != "--colmap" {
+                return Err("declare --colmap <executável local>".into());
+            }
+            let mut method = noah_photogrammetry::surface::Method::DelaunaySparse;
+            let mut timeout = 600;
+            let mut i = 5;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--poisson"
+                        if method == noah_photogrammetry::surface::Method::DelaunaySparse =>
+                    {
+                        method = noah_photogrammetry::surface::Method::PoissonDense;
+                        i += 1;
+                    }
+                    "--timeout" if i + 1 < args.len() => {
+                        timeout = args[i + 1].parse()?;
+                        i += 2;
+                    }
+                    _ => return Err("opção de malha inválida".into()),
+                }
+            }
+            noah_photogrammetry::surface::from_run(noah_photogrammetry::surface::Config {
+                source: args[1].clone().into(),
+                output: args[2].clone().into(),
+                engine: args[4].clone().into(),
+                method,
+                timeout: std::time::Duration::from_secs(timeout),
+            })?;
+            println!("superfície concluída; OBJ em {}/exports/mesh.obj", args[2]);
         }
         "run-inspect" if args.len() == 2 => {
             let manifest = noah_pipeline::inspect(Path::new(&args[1]))?;

@@ -6,11 +6,11 @@ texturas externas. Conferidas contra docs/quality/e2-dataset-hashes.json.
 hashes.json registra os arquivos incluídos; truth.json guarda câmeras ideais,
 sem constituir validação física/metrológica de uma reconstrução.
 
-Na interface: Reconstrução → Usar fotos do kit incluído → escolher executável
-COLMAP **3.11.x** local → pasta gravável de resultados → Iniciar reconstrução.
-Deixe a densificação desmarcada para o teste CPU. Cada run exige nome novo e
+Na interface: Reconstrução → Usar fotos do kit → escolher executável
+COLMAP **3.11.x** local → pasta gravável de resultados → Iniciar pelas fotos.
+Escolha Nuvem esparsa · CPU para pontos ou Malha rápida da esparsa · CPU para faces. Cada run exige nome novo e
 preserva originais, snapshots, parâmetros, hashes, etapas, logs e resultados.
-Ao concluir, use Abrir nuvem no workspace. Inspecione pontos, registre medidas
+Ao concluir, use Abrir esparsa. Inspecione pontos, registre medidas
 em unidades da cena, salve/reabra a sessão e exporte relatório/peça selecionada.
 
 COLMAP não vem no pacote. Instale 3.11.x segundo as instruções oficiais:
@@ -25,9 +25,13 @@ E2 histórico: 7592 pontos, 12 câmeras registradas. Esse resultado é explicita
 pré-processado. Uma nova execução pode produzir outra contagem: SfM não é
 prometido bit a bit determinístico. Nenhuma unidade física é inferida.
 
-O pipeline validado é fotos → reconstrução **esparsa** → pontos → inspeção →
-salvar/exportar. Não se promete malha densa ou separação automática em peças.
-Para wireframe, alinhamento e estilhaços, há malhas sintéticas independentes em
-../alinhamento e ../inspection-box.obj: não são apresentadas como malhas obtidas
-pela reconstrução destas fotos. Dense exige COLMAP com CUDA/GPU e segue sem
-validação real nesta entrega. Guia completo no LEIA-ME do aplicativo.
+O pipeline real agora validado é fotos → câmeras/pontos → superfície Delaunay
+CPU → inspeção → salvar/exportar. Escolha Malha rápida da esparsa · CPU e depois
+Abrir malha no workspace. Abrir superfície pronta usa superficie-cpu.obj,
+resultado real pré-processado destas fotos: 3.267 vértices e 6.516 triângulos.
+Origem e hashes em superficie-cpu-origem.json; método/limites em
+superficie-cpu.metadata.json. Não possui textura UV nem validação metrológica.
+
+As malhas em ../alinhamento e ../inspection-box.obj continuam sendo exemplos
+sintéticos independentes. Dense exige COLMAP com CUDA/GPU e segue sem validação
+real a partir de fotos nesta entrega. Não há separação automática em peças.
