@@ -13,6 +13,8 @@ pub struct ReconstructionJob {
     pub mesh: bool,
     pub source_run: Option<PathBuf>,
     pub clean_revision: Option<PathBuf>,
+    pub refine_parent: Option<PathBuf>,
+    pub additional_images: PathBuf,
     pub timeout: u64,
     pub output: Option<PathBuf>,
     pub worker: Option<Receiver<Result<()>>>,
@@ -31,6 +33,8 @@ impl Default for ReconstructionJob {
             mesh: true,
             source_run: None,
             clean_revision: None,
+            refine_parent: None,
+            additional_images: PathBuf::new(),
             timeout: 600,
             output: None,
             worker: None,
@@ -70,7 +74,11 @@ impl ReconstructionJob {
         if self.parent.join(&self.name).exists() {
             return Some("Esse nome já existe. Escolha uma nova revisão".into());
         }
-        if let Some(source) = &self.source_run {
+        if let Some(parent) = &self.refine_parent {
+            if !parent.is_dir() || !self.additional_images.is_dir() {
+                return Some("Escolha um run pai e a pasta de fotos adicionais".into());
+            }
+        } else if let Some(source) = &self.source_run {
             if !source.is_dir() || !self.mesh {
                 return Some("Continuar um run exige origem válida e modo de superfície".into());
             }
@@ -105,7 +113,7 @@ impl ReconstructionJob {
         if self.worker.is_some() {
             return Err("reconstrução já em andamento".into());
         }
-        if (!self.images.is_dir() && self.source_run.is_none())
+        if (!self.images.is_dir() && self.source_run.is_none() && self.refine_parent.is_none())
             || !self.engine.is_file()
             || !self.parent.is_dir()
         {
@@ -122,7 +130,11 @@ impl ReconstructionJob {
             return Err("escolha um novo nome; resultados existentes serão preservados".into());
         }
         let config = noah_photogrammetry::Config {
-            images: self.images.clone(),
+            images: if self.refine_parent.is_some() {
+                self.additional_images.clone()
+            } else {
+                self.images.clone()
+            },
             engine: self.engine.clone(),
             output: output.clone(),
             dense: self.dense,
@@ -133,13 +145,16 @@ impl ReconstructionJob {
             return Err("escolha um modo de malha para continuar um run".into());
         }
         let source = self.source_run.clone();
+        let refinement = self.refine_parent.clone();
         let clean = self.clean_revision.clone();
         if clean.is_some() && self.dense {
             return Err("revisão esparsa limpa exige malha CPU".into());
         }
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
-            let result = if let Some(source) = source {
+            let result = if let Some(parent) = refinement {
+                noah_photogrammetry::refinement::refine(&parent, config)
+            } else if let Some(source) = source {
                 let config = noah_photogrammetry::surface::Config {
                     source,
                     engine: config.engine,

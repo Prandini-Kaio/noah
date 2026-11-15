@@ -312,3 +312,61 @@ fn clean_revision_derives_surface_with_provenance_and_rejects_tamper() {
     assert!(surface::from_clean_revision(cfg(bad.clone()), &revision).is_err());
     assert!(!bad.exists());
 }
+
+#[test]
+fn refinement_adds_unique_images_traces_parent_and_preserves_sources() {
+    let t = Temp::new();
+    let config = setup(&t, "sparse");
+    let root = config.output.clone();
+    let engine = config.engine.clone();
+    reconstruct(config).unwrap();
+    let original = fs::read(root.join("run.json")).unwrap();
+    let extras = t.0.join("additional");
+    fs::create_dir(&extras).unwrap();
+    fs::write(extras.join("duplicate.jpg"), b"\xff\xd8\xfftest").unwrap();
+    fs::write(extras.join("new-a.jpg"), b"\xff\xd8\xffnew-a").unwrap();
+    fs::write(extras.join("new-b.jpg"), b"\xff\xd8\xffnew-b").unwrap();
+    let out = t.0.join("revised");
+    noah_photogrammetry::refinement::refine(
+        &root,
+        Config {
+            images: extras.clone(),
+            engine: engine.clone(),
+            output: out.clone(),
+            dense: false,
+            mesh: false,
+            timeout: Duration::from_secs(3),
+        },
+    )
+    .unwrap();
+    let m = inspect(&out).unwrap();
+    assert_eq!(m.inputs.len(), 3);
+    assert_eq!(m.parameters["new_unique_images"], "2");
+    assert_eq!(m.parameters["duplicate_images_ignored"], "1");
+    assert!(
+        m.artifacts
+            .iter()
+            .any(|a| a.kind == "capture_revision_provenance")
+    );
+    assert_eq!(fs::read(root.join("run.json")).unwrap(), original);
+    assert_eq!(fs::read(out.join("parent-run.json")).unwrap(), original);
+    let only_duplicates = t.0.join("duplicates");
+    fs::create_dir(&only_duplicates).unwrap();
+    fs::write(only_duplicates.join("old.jpg"), b"\xff\xd8\xfftest").unwrap();
+    let rejected = t.0.join("rejected");
+    assert!(
+        noah_photogrammetry::refinement::refine(
+            &root,
+            Config {
+                images: only_duplicates,
+                engine,
+                output: rejected.clone(),
+                dense: false,
+                mesh: false,
+                timeout: Duration::from_secs(3)
+            }
+        )
+        .is_err()
+    );
+    assert!(!rejected.exists());
+}

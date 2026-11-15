@@ -272,3 +272,5 @@ impl TriangleMesh {
 }
 
 pub mod cleaning;
+
+pub mod registration;

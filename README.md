@@ -12,8 +12,9 @@ fotogrametria e explorar resultados em um workspace desktop.
 | E3 — Workspace desktop | Fluxos principais pela interface, reconstrução acompanhada e sessões verificadas |
 | E4 — Medições iniciais | Distâncias, ângulos ABC, dimensões XYZ, escala, anotações e relatórios; sem validação metrológica |
 | Recorte E5 — Montagens | Hierarquia, alinhamento translacional por vértices, exemplo e explosão reversível |
+| E6 inicial — Revisões | Fotos adicionais, novo SfM, alinhamento por câmeras e comparação rastreável |
 
-Snapshot de desenvolvimento: 85 testes passaram em Linux x86_64. O resultado
+Snapshot de desenvolvimento: 91 testes passaram em Linux x86_64. O resultado
 esparso incluído contém 7.592 pontos. Não são prometidas precisão metrológica,
 compatibilidade universal de formatos ou execução gráfica em todos os sistemas.
 
@@ -25,6 +26,19 @@ cd noah
 ```
 
 Também é possível baixar em **Code → Download ZIP**.
+
+## Revisões de captura — v0.11
+
+Adicione fotos ao run selecionado sem alterar o anterior. A revisão reprocessa
+as fotografias únicas e registra a proveniência. **Comparar…** alinha pelas
+câmeras comuns e oferece sobreposição, antes/depois, diferenças e relatório JSON.
+O kit inclui duas reconstruções reais prontas para comparar sem COLMAP.
+[Passo a passo e limites](docs/desktop/E6-GUIA.md).
+
+Pendentes: densificação GPU real, textura/qualidade de superfície; primitivas e
+validação física; rotação/ICP e instâncias repetidas; refinamento incremental e
+comparação de revisões editadas; sensores e CAD. Os MVPs permanecem parciais onde
+esses critérios ainda não foram demonstrados.
 
 ## Fluxo guiado e apresentação — v0.10
 

@@ -6,7 +6,9 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
+pub mod comparison;
 pub mod model;
+pub mod refinement;
 pub mod surface;
 
 pub struct Config {

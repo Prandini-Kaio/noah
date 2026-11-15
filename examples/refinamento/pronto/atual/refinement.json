@@ -1,0 +1,120 @@
+{
+  "duplicates_ignored": 0,
+  "inherited_geometry_edits": false,
+  "inherited_physical_calibration": false,
+  "inputs": [
+    {
+      "origin": {
+        "original_name": "view-00.png",
+        "snapshot": "images/0000.png",
+        "source": "parent"
+      },
+      "sha256": "8acc6a2a1b9909da5709fedff6003639ff989accace26692e10e619fa7e1796b",
+      "snapshot": "images/0000.png"
+    },
+    {
+      "origin": {
+        "original_name": "view-01.png",
+        "snapshot": "images/0001.png",
+        "source": "parent"
+      },
+      "sha256": "cc6d7b7462f3ddd74ac5037dd8745b9200b4562d5fa0b81b536b0ccd4d0f7925",
+      "snapshot": "images/0001.png"
+    },
+    {
+      "origin": {
+        "original_name": "view-02.png",
+        "snapshot": "images/0002.png",
+        "source": "parent"
+      },
+      "sha256": "59290bee12f50194b0f493e3f179148e839607319d8775e9672bfa687f4464a1",
+      "snapshot": "images/0002.png"
+    },
+    {
+      "origin": {
+        "original_name": "view-03.png",
+        "snapshot": "images/0003.png",
+        "source": "parent"
+      },
+      "sha256": "d3bd95162f7ed0b167a0ca40986f78696a3e6fe4f5c9b91ba126b4557d3d5ec5",
+      "snapshot": "images/0003.png"
+    },
+    {
+      "origin": {
+        "original_name": "view-04.png",
+        "snapshot": "images/0004.png",
+        "source": "parent"
+      },
+      "sha256": "684dc6e5a063597f40acbd4b21632449e0232a7d3b2b287726c522e91a4d5026",
+      "snapshot": "images/0004.png"
+    },
+    {
+      "origin": {
+        "original_name": "view-05.png",
+        "snapshot": "images/0005.png",
+        "source": "parent"
+      },
+      "sha256": "cddd9b6559f854e7df0cfd87f63169fd87f36620df063429a9147932debef9c8",
+      "snapshot": "images/0005.png"
+    },
+    {
+      "origin": {
+        "original_name": "view-06.png",
+        "snapshot": "images/0006.png",
+        "source": "parent"
+      },
+      "sha256": "f0bdb31aaa3132a0e2394f630eeafdad415403637798bb4923435dd9191fe8c0",
+      "snapshot": "images/0006.png"
+    },
+    {
+      "origin": {
+        "original_name": "view-07.png",
+        "snapshot": "images/0007.png",
+        "source": "parent"
+      },
+      "sha256": "8471b7d990bf16dfd863b991fc08ded8fc5b4aab7b786b3538392a4b004f20d3",
+      "snapshot": "images/0007.png"
+    },
+    {
+      "origin": {
+        "original_name": "view-08.png",
+        "snapshot": "images/0008.png",
+        "source": "parent"
+      },
+      "sha256": "0c9ff3463d07b0712fa28a4c7a990c4480a63f3478a6ddc8d8c57774272c9571",
+      "snapshot": "images/0008.png"
+    },
+    {
+      "origin": {
+        "original_name": "view-09.png",
+        "snapshot": "images/0009.png",
+        "source": "parent"
+      },
+      "sha256": "8f17cbf467d95fe24550dab699307cb54834a1a266447eaf00b6b0c7dc80a745",
+      "snapshot": "images/0009.png"
+    },
+    {
+      "origin": {
+        "path": "/workspace/work/github-publication/NOAH-2.0/examples/refinamento/adicionais/view-10.png",
+        "source": "additional"
+      },
+      "sha256": "ae412b68b33138d5386dc845b5961d310d9931c5b6ac63465425261dccd1dd3a",
+      "snapshot": "images/0010.png"
+    },
+    {
+      "origin": {
+        "path": "/workspace/work/github-publication/NOAH-2.0/examples/refinamento/adicionais/view-11.png",
+        "source": "additional"
+      },
+      "sha256": "f71f2035fbc93477444ab0c24edf26769cdaa4be361dbf2f9855686ed5ff50a3",
+      "snapshot": "images/0011.png"
+    }
+  ],
+  "new_run": "cb586225-8ec4-42f2-9ce9-77e918891b0b",
+  "new_unique_images": 2,
+  "parent_manifest_sha256": "1335c68e1f1c455fd446371522463046e98a20ff4566fa5f6b3bc5d1ae84c8d6",
+  "parent_path": "/workspace/work/e6-real-base",
+  "parent_run": "c6b0e12a-5cd9-4df7-b3ae-1f13fb202d76",
+  "schema_version": 1,
+  "strategy": "full_sfm_reprocess"
+}

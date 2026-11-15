@@ -81,6 +81,7 @@ impl Desktop {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button("Configurações…").clicked(){self.show_general=true;}
                         if theme::action(ui, "Salvar", p, false).clicked() {
+                            self.end_comparison();
                             if self.cleaning_target().is_some(){self.notice(Err("Salve a revisão limpa ou descarte a edição antes de salvar o workspace".into()),"");}else{
                             self.choose(Purpose::SaveSession);
                             }
@@ -175,7 +176,7 @@ impl Desktop {
                         if self.tree_matches.is_empty() && !self.tree_search.is_empty() {
                             ui.label("Nenhum resultado para a busca.");
                         }
-                        ui.add_enabled_ui(self.pending.is_none() && self.blast.is_none(), |ui| {
+                        ui.add_enabled_ui(self.pending.is_none() && self.blast.is_none() && self.revisions.preview.is_none(), |ui| {
                             self.tree(ui, None, 0)
                         });
                         if self.scene.items.is_empty() {
@@ -193,7 +194,7 @@ impl Desktop {
                         ui.separator();
                         egui::CollapsingHeader::new("Nova montagem").show(ui, |ui| {
                             ui.add_enabled_ui(
-                                self.pending.is_none() && self.blast.is_none(),
+                                self.pending.is_none() && self.blast.is_none() && self.revisions.preview.is_none(),
                                 |ui| {
                                     ui.text_edit_singleline(&mut self.new_group_name);
                                     if ui.button("Criar montagem na seleção").on_hover_text("Se uma montagem estiver selecionada, cria uma submontagem dentro dela; caso contrário, cria na raiz.").clicked() {
@@ -230,6 +231,8 @@ impl Desktop {
         }
         egui::SidePanel::right("context_inspector").default_width(320.).width_range(290.0..=440.).resizable(true).frame(egui::Frame::new().fill(p.surface).inner_margin(12)).show(ctx,|ui|{
             ui.horizontal(|ui|{ui.strong("Inspetor");if ui.small_button("×").on_hover_text("Ocultar inspetor").clicked(){self.right_visible=false;}});
+            if self.revisions.preview.is_some(){ui.heading("Comparação E6");ui.label("Anterior: azul · Atual: laranja. Prévia alinhada, originais preservados.");if ui.button("Ajustar comparação…").clicked(){self.revisions.open=true;}
+if ui.button("Sair da comparação").clicked(){self.end_comparison();}return;}
             let item=self.scene.selected.as_ref().and_then(|id|self.scene.items.iter().find(|i|&i.id==id));
             let group=self.scene.selected.as_ref().and_then(|id|self.scene.assemblies.iter().find(|g|&g.id==id));
             egui::Frame::group(ui.style()).fill(p.elevated).show(ui,|ui|{ui.set_min_width(ui.available_width());if let Some(i)=item{ui.colored_label(p.primary,if matches!(i.geometry.as_ref(),Geometry::Points(_)){"NUVEM SELECIONADA"}else{"MALHA SELECIONADA"});ui.strong(&i.name);ui.label(if i.visible{"Visível no viewport"}else{"Oculta no viewport"});ui.label(RichText::new(self.selection_path()).size(10.).color(p.secondary));}else if let Some(g)=group{ui.colored_label(p.primary,"MONTAGEM SELECIONADA");ui.strong(&g.name);ui.label(RichText::new(self.selection_path()).size(10.).color(p.secondary));}else{ui.strong("Nenhum objeto selecionado");ui.label("Selecione na estrutura ou clique na geometria.");}});
@@ -240,6 +243,8 @@ impl Desktop {
                 _=>{
                     let cloud=self.scene.selected.as_ref().and_then(|id|self.scene.items.iter().find(|i|&i.id==id)).is_some_and(|i|matches!(i.geometry.as_ref(),Geometry::Points(_)));
                     ui.strong("Geometria selecionada");
+                    if ui.button("Revisões / comparar capturas…").clicked(){self.revisions.open=true;}
+                    if ui.add_enabled(self.selected_run().is_some(),egui::Button::new("Adicionar fotos / nova revisão…")).clicked(){self.configure_refinement();}
                     if ui.add_enabled(cloud,egui::Button::new("Editar / limpar nuvem…")).on_hover_text("Selecionar pontos, recortar, tratar outliers e salvar revisão.").clicked(){if self.cleaning_target().is_none(){let r=self.begin_cleaning();self.notice(r,"Edição de nuvem iniciada.");}self.cleaning.open=true;}
                     if ui.add_enabled(self.scene.selected.is_some(),egui::Button::new("Enquadrar seleção")).clicked(){let r=self.scene.fit(true);self.notice(r,"Seleção enquadrada.");}
                     if ui.add_enabled(self.selected_run().is_some(),egui::Button::new("Resultados desta reconstrução…")).clicked(){self.attach_selected_run();}
@@ -344,10 +349,15 @@ if ui.button("Configurações gerais…").clicked(){self.show_general=true;}
                         }
                         self.cleaning.open = true;
                     }
+                    if ui.button("Comparar…").clicked() {
+                        self.revisions.open = true;
+                    }
                     if ui.button("Desmontagem…").clicked() {
+                        self.end_comparison();
                         self.show_effects = true;
                     }
                     if ui.button("Medir").clicked() {
+                        self.end_comparison();
                         self.restore_blast();
                         self.show_measurements = true;
                         self.module = Module::Measures;
@@ -415,7 +425,15 @@ if ui.button("Configurações gerais…").clicked(){self.show_general=true;}
     }
     pub(super) fn fit_view(&mut self) {
         self.stop_transition();
-        let r = if let Some(b) = &self.blast {
+        let r = if let Some(preview) = &self.revisions.preview {
+            let mut s = preview.clone();
+            s.camera = self.scene.camera.clone();
+            let r = s.fit(false);
+            if r.is_ok() {
+                self.scene.camera = s.camera;
+            }
+            r
+        } else if let Some(b) = &self.blast {
             b.fit_camera(&mut self.scene.camera)
         } else {
             self.scene.fit(false)

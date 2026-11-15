@@ -18,6 +18,7 @@ mod metrology;
 mod preferences;
 mod preparation;
 mod reconstruction;
+mod revisions;
 mod shell;
 mod theme;
 mod viewport_tools;
@@ -33,6 +34,7 @@ enum Replace {
 }
 struct Desktop {
     scene: Scene,
+    revisions: revisions::RevisionsUi,
     preferences: preferences::Preferences,
     show_general: bool,
     pipeline_tab: usize,
@@ -138,6 +140,7 @@ impl Desktop {
             focus_loaded: false,
             edit_loaded: false,
             scene,
+            revisions: Default::default(),
             preparation,
             cleaning,
             alignment: Default::default(),
@@ -229,6 +232,7 @@ impl Desktop {
         self.load_source_mode(path, true);
     }
     fn load_source_mode(&mut self, path: PathBuf, sparse: bool) {
+        self.end_comparison();
         self.restore_blast();
         let (tx, rx) = mpsc::channel();
         let mut scene = self.scene.clone();
@@ -250,6 +254,7 @@ impl Desktop {
         self.error = false;
     }
     fn replace_scene(&mut self, action: Replace) {
+        self.end_comparison();
         if matches!(action, Replace::New) {
             self.blast = None;
             self.alignment = Default::default();
@@ -309,6 +314,28 @@ impl Desktop {
         };
         self.preferences.remember(purpose, &dir);
         match purpose {
+            Purpose::AdditionalImages => {
+                self.reconstruction.additional_images = path;
+                self.notice(
+                    Ok(()),
+                    "Fotos adicionais selecionadas; a revisão preservará o pai.",
+                );
+            }
+            Purpose::CompareReference => self.revisions.reference = path,
+            Purpose::CompareUpdated => self.revisions.updated = path,
+            Purpose::ComparisonOpen => self.reopen_comparison(path),
+            Purpose::ComparisonReport => {
+                let result = self
+                    .revisions
+                    .comparison
+                    .as_ref()
+                    .ok_or_else(|| "calcule a comparação primeiro".into())
+                    .and_then(|c| noah_photogrammetry::comparison::save(c, &path));
+                self.notice(
+                    result,
+                    "Comparação salva com hashes e referencial explícito.",
+                );
+            }
             Purpose::Import | Purpose::Project => self.load_source(path),
             Purpose::OpenSession => self.request_replace(Replace::Session(path)),
             Purpose::SaveSession => {
@@ -337,6 +364,7 @@ impl Desktop {
                 self.preferences.images = path.clone();
                 self.reconstruction.images = path;
                 self.reconstruction.source_run = None;
+                self.reconstruction.refine_parent = None;
                 self.reconstruction.clean_revision = None;
                 self.notice(
                     Ok(()),
@@ -437,7 +465,9 @@ impl Desktop {
             if response.hovered() && self.pending.is_none(){let scroll=ctx.input(|i|i.smooth_scroll_delta.y);if scroll!=0.{self.stop_transition();self.scene.camera.zoom(scroll as f64);self.dirty=true;}}
             if !ctx.wants_keyboard_input()&&ctx.input(|i|i.key_pressed(egui::Key::F)){self.fit_view();}
             let aligning=self.alignment.preview && self.alignment.plan.as_ref().is_some_and(|p|p.is_current(&self.scene));
-            let mut display_scene=self.scene.clone();
+            let comparing=self.revisions.preview.is_some();
+            let mut display_scene=self.revisions.preview.clone().unwrap_or_else(||self.scene.clone());
+            if comparing{display_scene.camera=self.scene.camera.clone();}
             if aligning && let Some(plan)=&self.alignment.plan && let Some(item)=display_scene.items.iter_mut().find(|i|i.id==plan.source().item_id){item.placement=plan.placement().clone();display_scene.explosion=0.;}
             if let Some(t)=&self.transition{display_scene.explosion=t.value();display_scene.camera=t.camera();}
             if let Some(b)=&self.blast&&let Some(c)=b.camera(){display_scene.camera=c;}
@@ -450,14 +480,14 @@ impl Desktop {
                     if let (Some(a),Some(b))=(display_scene.camera.project(a,size),display_scene.camera.project(b,size)){display_painter.line_segment([to_screen([a[0],a[1]]),to_screen([b[0],b[1]])],Stroke::new(1.0_f32,palette.border.gamma_multiply(0.55)));}
                 }}
             }
-            for item in &mut display_scene.items { if matches!(item.geometry.as_ref(),Geometry::Mesh(_)) && !self.show_mesh || matches!(item.geometry.as_ref(),Geometry::Points(_)) && !self.show_clouds {item.visible=false;} }
+            for item in &mut display_scene.items { if matches!(item.geometry.as_ref(),Geometry::Mesh(_)) && !self.show_mesh || matches!(item.geometry.as_ref(),Geometry::Points(_)) && !self.show_clouds && !comparing {item.visible=false;} }
             display_scene.wireframe=self.display_mode==shell::DisplayMode::Wire || self.scene.wireframe;
             let mut primitives=noah_workspace::project(&display_scene,size);
             if self.display_mode==shell::DisplayMode::Points { primitives.retain(|p|p.pixels.len()==1); let transforms=display_scene.world_transforms(true).ok(); if let Some(ts)=transforms { let total:usize=display_scene.items.iter().filter(|i|i.visible && matches!(i.geometry.as_ref(),Geometry::Mesh(_))).map(|i|i.geometry.positions().len()).sum();let stride=total.div_ceil(noah_workspace::DISPLAY_POINTS).max(1);let mut serial=0;for (index,item) in display_scene.items.iter().enumerate().filter(|(_,i)|i.visible && matches!(i.geometry.as_ref(),Geometry::Mesh(_))) {for &p in item.geometry.positions(){let take=serial%stride==0;serial+=1;if take && let Ok(p)=ts[index].apply(p) && let Some(p)=display_scene.camera.project(p,size){primitives.push(noah_workspace::Primitive{item:index,pixels:vec![[p[0],p[1]]],depth:p[2],color:[142,187,210]});}}} } }
             if let Some(blast)=&self.blast {primitives.retain(|p|!blast.targets.contains(&p.item)); primitives.extend(blast.project(&display_scene.camera,size).into_iter().filter(|p|display_scene.items[p.item].visible));}
             if let Some(id)=self.cleaning_target(){primitives.retain(|p|display_scene.items[p.item].id!=id);}
             primitives.sort_by(|a,b|b.depth.total_cmp(&a.depth));self.shown=primitives.len()+self.cleaning_display_count();
-            if response.clicked() && !self.cleaning.rect_mode && self.pending.is_none()&& let Some(pos)=response.interact_pointer_pos() && rect.contains(pos){
+            if response.clicked() && !comparing && !self.cleaning.rect_mode && self.pending.is_none()&& let Some(pos)=response.interact_pointer_pos() && rect.contains(pos){
                 let point=[(pos.x-rect.left()) as f64,(pos.y-rect.top()) as f64];
                 if aligning{self.notice(Err("Encerre a prévia de alinhamento para selecionar ou medir".into()),"");}
                 else if self.blast.is_some(){self.notice(Err("Restaure o objeto antes de selecionar ou medir; os estilhaços são apenas visuais".into()),"");}
@@ -473,7 +503,7 @@ impl Desktop {
             let mut mesh=egui::Mesh::default();let mut edges=Vec::new();
             for primitive in &primitives{
                 if primitive.pixels.iter().flatten().any(|v|v.abs()>1e7){continue;}
-                let selected=Some(&self.scene.items[primitive.item].id)==self.scene.selected.as_ref()||self.scene.selected.as_ref().is_some_and(|id|self.scene.belongs_to(primitive.item,id));
+                let selected=!comparing && (Some(&self.scene.items[primitive.item].id)==self.scene.selected.as_ref()||self.scene.selected.as_ref().is_some_and(|id|self.scene.belongs_to(primitive.item,id)));
                 let original=primitive.color;let color=if selected{Color32::from_rgb(((original[0] as u16+palette.primary.r() as u16)/2) as u8,((original[1] as u16+palette.primary.g() as u16)/2) as u8,((original[2] as u16+palette.primary.b() as u16)/2) as u8)}else{Color32::from_rgb(original[0],original[1],original[2])};
                 if primitive.pixels.len()==1{let pos=to_screen(primitive.pixels[0]);mesh.add_colored_rect(Rect::from_center_size(pos,Vec2::splat(self.scene.point_size)),color);}else{
                     let points:Vec<_>=primitive.pixels.iter().map(|&p|to_screen(p)).collect();
@@ -485,14 +515,14 @@ impl Desktop {
             display_painter.add(egui::Shape::mesh(mesh));display_painter.extend(edges);
             let visual_transforms=display_scene.world_transforms(true).ok();
             let anchor_screen=|a:&Anchor|self.scene.items.iter().position(|i|i.id==a.item_id).filter(|&index|self.scene.items[index].visible).and_then(|index|self.scene.items[index].geometry.positions().get(a.vertex).and_then(|&p|visual_transforms.as_ref().and_then(|ts|ts[index].apply(p).ok()))).and_then(|p|display_scene.camera.project(p,size)).map(|p|to_screen([p[0],p[1]]));
-            for measure in self.scene.measurements.iter().filter(|_|self.scene.view.annotations && self.blast.is_none() && !aligning){
+            for measure in self.scene.measurements.iter().filter(|_|!comparing && self.scene.view.annotations && self.blast.is_none() && !aligning){
                 if let (Some(a),Some(b))=(anchor_screen(&measure.a),anchor_screen(&measure.b)){
                     display_painter.line_segment([a,b],Stroke::new(1.5_f32,palette.primary));display_painter.circle_filled(a,3.5,palette.primary);display_painter.circle_filled(b,3.5,palette.primary);
                     let label=match self.scene.distance(&measure.a,&measure.b){Ok(d)=>format!("{}: {:.*} {} (montado)",measure.name,self.scene.view.decimals,d.value,d.unit.map(|u|u.symbol()).unwrap_or("u. cena")),Err(_)=>format!("{}: recalibrar escala",measure.name)};
                     display_painter.text(a+(b-a)*0.5,egui::Align2::CENTER_BOTTOM,label,FontId::proportional(11.),palette.primary);
                 }
             }
-            for (i,a) in self.anchors.iter().filter(|_|self.blast.is_none()).enumerate(){if let Some(p)=anchor_screen(a){display_painter.circle_filled(p,6.,palette.warning);display_painter.text(p+Vec2::new(10.,-10.),egui::Align2::LEFT_BOTTOM,["A","B","C"].get(i).copied().unwrap_or("?"),FontId::proportional(14.),Color32::WHITE);}}
+            for (i,a) in self.anchors.iter().filter(|_|self.blast.is_none()&&!comparing).enumerate(){if let Some(p)=anchor_screen(a){display_painter.circle_filled(p,6.,palette.warning);display_painter.text(p+Vec2::new(10.,-10.),egui::Align2::LEFT_BOTTOM,["A","B","C"].get(i).copied().unwrap_or("?"),FontId::proportional(14.),Color32::WHITE);}}
             if self.measure_mode{display_painter.text(rect.center_top()+Vec2::new(0.,25.),egui::Align2::CENTER_TOP,if self.measurement_tool==metrology::MeasurementTool::Angle{"ÂNGULO: clique A, B (vértice), C"}else{"DISTÂNCIA: clique A e B"},FontId::proportional(14.),palette.primary);}
             if self.measure_mode&&self.transition.is_none()&&self.blast.is_none(){ctx.request_repaint_after(Duration::from_millis(75));
                 if let Some(pos)=response.hover_pos().filter(|pos|rect.contains(*pos)){
@@ -501,13 +531,14 @@ impl Desktop {
                     if let Some(a)=&self.hover_anchor&&let Some(p)=anchor_screen(a){display_painter.circle_stroke(p,9.,Stroke::new(1.5_f32,palette.primary));display_painter.line_segment([p-Vec2::new(13.,0.),p+Vec2::new(13.,0.)],Stroke::new(1.0_f32,palette.primary));display_painter.text(p+Vec2::new(15.,-15.),egui::Align2::LEFT_BOTTOM,format!("Vértice {}",a.vertex+1),FontId::proportional(11.),palette.primary);}
                 }else{self.hover_anchor=None;self.hover_pixel=None;}
             }
-            if self.scene.view.annotations && self.blast.is_none() && !aligning{self.draw_inspection(&display_scene,&display_painter,rect);}
+            if !comparing && self.scene.view.annotations && self.blast.is_none() && !aligning{self.draw_inspection(&display_scene,&display_painter,rect);}
             if aligning{display_painter.text(rect.center_top()+Vec2::new(0.,60.),egui::Align2::CENTER_TOP,"PRÉVIA DE ALINHAMENTO · aplique ou cancele na janela",FontId::proportional(13.),palette.warning);}
-            self.cleaning_viewport(ctx,&response,&display_painter,rect,&display_scene);
+            if !comparing{self.cleaning_viewport(ctx,&response,&display_painter,rect,&display_scene);}
+            if comparing{display_painter.text(rect.center_top()+Vec2::new(0.,18.),egui::Align2::CENTER_TOP,"COMPARAÇÃO E6 · câmeras alinhadas · sem unidade física",FontId::proportional(13.),palette.warning);}
             viewport_tools::draw(&painter,&display_scene,outer,rect,palette,response.hover_pos());
             let top=rect.left_top()+Vec2::new(22.,22.);display_painter.text(top,egui::Align2::LEFT_TOP,if display_scene.camera.projection==Projection::Orthographic{"ORTOGRÁFICA · U/V"}else{"PERSPECTIVA"},FontId::proportional(11.),palette.secondary);
             display_painter.text(top+Vec2::new(0.,20.),egui::Align2::LEFT_TOP,format!("{} primitivas na tela",self.shown),FontId::proportional(10.),palette.secondary);
-            if self.scene.items.is_empty(){let center=rect.center();display_painter.text(center-Vec2::new(0.,25.),egui::Align2::CENTER_CENTER,"Seu espaço de geometria",FontId::proportional(27.),palette.text);display_painter.text(center+Vec2::new(0.,20.),egui::Align2::CENTER_CENTER,"Importe fotos, uma geometria ou abra seu projeto.",FontId::proportional(13.),palette.secondary);
+            if self.scene.items.is_empty()&&!comparing{let center=rect.center();display_painter.text(center-Vec2::new(0.,25.),egui::Align2::CENTER_CENTER,"Seu espaço de geometria",FontId::proportional(27.),palette.text);display_painter.text(center+Vec2::new(0.,20.),egui::Align2::CENTER_CENTER,"Importe fotos, uma geometria ou abra seu projeto.",FontId::proportional(13.),palette.secondary);
                 let area=Rect::from_center_size(center+Vec2::new(0.,90.),Vec2::new(350.,85.));
                 ui.scope_builder(egui::UiBuilder::new().max_rect(area),|ui|{ui.vertical_centered(|ui|{if theme::action(ui,"Importar fotos",palette,true).clicked(){self.choose(Purpose::Images);self.module=shell::Module::Reconstruction;self.show_reconstruction=true;self.pipeline_tab=0;self.right_visible=true;}ui.horizontal(|ui|{if ui.button("Abrir geometria").clicked(){self.choose(Purpose::Import);}
 if ui.button("Abrir workspace").clicked(){self.choose(Purpose::OpenSession);}});});});
@@ -682,6 +713,7 @@ impl eframe::App for Desktop {
         }
         self.preparation_window(ctx);
         self.cleaning_window(ctx);
+        self.revisions_window(ctx);
         self.general_window(ctx);
         if self.show_effects {
             self.effects_window(ctx);

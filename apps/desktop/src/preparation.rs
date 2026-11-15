@@ -53,6 +53,7 @@ impl Desktop {
                     match result {
                         Ok(output) => {
                             self.reconstruction.images = output.join("images");
+                            self.reconstruction.refine_parent = None;
                             self.reconstruction.source_run = None;
                             self.reconstruction.clean_revision = None;
                             self.preparation.status = format!(
