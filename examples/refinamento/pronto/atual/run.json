@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "run_id": "cb586225-8ec4-42f2-9ce9-77e918891b0b",
+  "started_ms": 1794772960917,
+  "finished_ms": 1794773000907,
+  "status": "succeeded",
+  "engine": "/workspace/work/colmap-tools/colmap",
+  "engine_version": "COLMAP 3.11.1 -- Structure-from-Motion and Multi-View Stereo",
+  "parameters": {
+    "duplicate_images_ignored": "0",
+    "engine_sha256": "bb9f869d5a32b674f5c6fdd4e42ed33ed91702823e06e6e05e1902b0bd5a6e7d",
+    "feature_gpu": "false",
+    "input_directory": "/workspace/work/e6-real-base/images",
+    "matching_gpu": "false",
+    "mode": "refinement_full_reprocess",
+    "new_unique_images": "2",
+    "noah_product_version": "2.0",
+    "parent_manifest_sha256": "1335c68e1f1c455fd446371522463046e98a20ff4566fa5f6b3bc5d1ae84c8d6",
+    "parent_run": "c6b0e12a-5cd9-4df7-b3ae-1f13fb202d76",
+    "threads": "2",
+    "timeout_ms": "600000"
+  },
+  "inputs": [
+    {
+      "original_name": "0000.png",
+      "snapshot": "images/0000.png",
+      "sha256": "8acc6a2a1b9909da5709fedff6003639ff989accace26692e10e619fa7e1796b",
+      "bytes": 144374
+    },
+    {
+      "original_name": "0001.png",
+      "snapshot": "images/0001.png",
+      "sha256": "cc6d7b7462f3ddd74ac5037dd8745b9200b4562d5fa0b81b536b0ccd4d0f7925",
+      "bytes": 141503
+    },
+    {
+      "original_name": "0002.png",
+      "snapshot": "images/0002.png",
+      "sha256": "59290bee12f50194b0f493e3f179148e839607319d8775e9672bfa687f4464a1",
+      "bytes": 137768
+    },
+    {
+      "original_name": "0003.png",
+      "snapshot": "images/0003.png",
+      "sha256": "d3bd95162f7ed0b167a0ca40986f78696a3e6fe4f5c9b91ba126b4557d3d5ec5",
+      "bytes": 135301
+    },
+    {
+      "original_name": "0004.png",
+      "snapshot": "images/0004.png",
+      "sha256": "684dc6e5a063597f40acbd4b21632449e0232a7d3b2b287726c522e91a4d5026",
+      "bytes": 134456
+    },
+    {
+      "original_name": "0005.png",
+      "snapshot": "images/0005.png",
+      "sha256": "cddd9b6559f854e7df0cfd87f63169fd87f36620df063429a9147932debef9c8",
+      "bytes": 131781
+    },
+    {
+      "original_name": "0006.png",
+      "snapshot": "images/0006.png",
+      "sha256": "f0bdb31aaa3132a0e2394f630eeafdad415403637798bb4923435dd9191fe8c0",
+      "bytes": 130177
+    },
+    {
+      "original_name": "0007.png",
+      "snapshot": "images/0007.png",
+      "sha256": "8471b7d990bf16dfd863b991fc08ded8fc5b4aab7b786b3538392a4b004f20d3",
+      "bytes": 131765
+    },
+    {
+      "original_name": "0008.png",
+      "snapshot": "images/0008.png",
+      "sha256": "0c9ff3463d07b0712fa28a4c7a990c4480a63f3478a6ddc8d8c57774272c9571",
+      "bytes": 132878
+    },
+    {
+      "original_name": "0009.png",
+      "snapshot": "images/0009.png",
+      "sha256": "8f17cbf467d95fe24550dab699307cb54834a1a266447eaf00b6b0c7dc80a745",
+      "bytes": 135764
+    },
+    {
+      "original_name": "view-10.png",
+      "snapshot": "images/0010.png",
+      "sha256": "ae412b68b33138d5386dc845b5961d310d9931c5b6ac63465425261dccd1dd3a",
+      "bytes": 139647
+    },
+    {
+      "original_name": "view-11.png",
+      "snapshot": "images/0011.png",
+      "sha256": "f71f2035fbc93477444ab0c24edf26769cdaa4be361dbf2f9855686ed5ff50a3",
+      "bytes": 143482
+    }
+  ],
+  "steps": [
+    {
+      "name": "version",
+      "arguments": [
+        "--help"
+      ],
+      "started_ms": 1794772960935,
+      "finished_ms": 1794772960961,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/00-version.stdout.log",
+      "stderr": "logs/00-version.stderr.log"
+    },
+    {
+      "name": "features",
+      "arguments": [
+        "feature_extractor",
+        "--database_path",
+        "/workspace/work/e6-real-revised/database.db",
+        "--image_path",
+        "/workspace/work/e6-real-revised/images",
+        "--ImageReader.camera_model",
+        "SIMPLE_RADIAL",
+        "--SiftExtraction.use_gpu",
+        "0",
+        "--SiftExtraction.num_threads",
+        "2",
+        "--SiftExtraction.max_image_size",
+        "1600"
+      ],
+      "started_ms": 1794772960962,
+      "finished_ms": 1794772965122,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/01-features.stdout.log",
+      "stderr": "logs/01-features.stderr.log"
+    },
+    {
+      "name": "matching",
+      "arguments": [
+        "exhaustive_matcher",
+        "--database_path",
+        "/workspace/work/e6-real-revised/database.db",
+        "--SiftMatching.use_gpu",
+        "0",
+        "--SiftMatching.num_threads",
+        "2"
+      ],
+      "started_ms": 1794772965123,
+      "finished_ms": 1794772980200,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/02-matching.stdout.log",
+      "stderr": "logs/02-matching.stderr.log"
+    },
+    {
+      "name": "mapping",
+      "arguments": [
+        "mapper",
+        "--database_path",
+        "/workspace/work/e6-real-revised/database.db",
+        "--image_path",
+        "/workspace/work/e6-real-revised/images",
+        "--output_path",
+        "/workspace/work/e6-real-revised/sparse",
+        "--Mapper.num_threads",
+        "2"
+      ],
+      "started_ms": 1794772980202,
+      "finished_ms": 1794773000092,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/03-mapping.stdout.log",
+      "stderr": "logs/03-mapping.stderr.log"
+    },
+    {
+      "name": "convert_0",
+      "arguments": [
+        "model_converter",
+        "--input_path",
+        "/workspace/work/e6-real-revised/sparse/0",
+        "--output_path",
+        "/workspace/work/e6-real-revised/model-0",
+        "--output_type",
+        "TXT"
+      ],
+      "started_ms": 1794773000093,
+      "finished_ms": 1794773000249,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/04-convert_0.stdout.log",
+      "stderr": "logs/04-convert_0.stderr.log"
+    },
+    {
+      "name": "meshing",
+      "arguments": [
+        "delaunay_mesher",
+        "--input_path",
+        "/workspace/work/e6-real-revised/sparse/0",
+        "--input_type",
+        "sparse",
+        "--output_path",
+        "/workspace/work/e6-real-revised/exports/mesh.ply",
+        "--DelaunayMeshing.num_threads",
+        "2"
+      ],
+      "started_ms": 1794773000285,
+      "finished_ms": 1794773000898,
+      "exit_code": 0,
+      "status": "succeeded",
+      "diagnostic": null,
+      "stdout": "logs/05-meshing.stdout.log",
+      "stderr": "logs/05-meshing.stderr.log"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "parent-run.json",
+      "kind": "parent_manifest_snapshot",
+      "sha256": "1335c68e1f1c455fd446371522463046e98a20ff4566fa5f6b3bc5d1ae84c8d6",
+      "bytes": 7509
+    },
+    {
+      "path": "refinement.json",
+      "kind": "capture_revision_provenance",
+      "sha256": "c47d9a8dd09ca835d722ae95359ba51b3ef6f7f4492b15583daf66a503a0fa34",
+      "bytes": 3722
+    },
+    {
+      "path": "exports/sparse.ply",
+      "kind": "sparse_point_cloud",
+      "sha256": "ec86c196ad8394044e0ca9f99fb62418705639933de61089738b5b46e0779b95",
+      "bytes": 512317
+    },
+    {
+      "path": "exports/reconstruction.json",
+      "kind": "cameras_and_poses",
+      "sha256": "99bd62bea08307a70654174c78de7c59ac4dbe92f0e70f807bb53c9a4609c8c6",
+      "bytes": 82820
+    },
+    {
+      "path": "model-0/cameras.txt",
+      "kind": "colmap_text_model",
+      "sha256": "b7df2074b5415b29e2874758db06ae6867fea2b08677612b01dc9a4e98260202",
+      "bytes": 1001
+    },
+    {
+      "path": "model-0/images.txt",
+      "kind": "colmap_text_model",
+      "sha256": "e0ffe83d3849ed764f8756a66fb9ea978312f7287c6c1687a09153d4928c44af",
+      "bytes": 2898582
+    },
+    {
+      "path": "model-0/points3D.txt",
+      "kind": "colmap_text_model",
+      "sha256": "8d97a76e15ebeb68f4ccd04113a5f4343599963345321e5aa4ab5c64e6dd0f82",
+      "bytes": 1097129
+    },
+    {
+      "path": "exports/mesh.ply",
+      "kind": "surface_raw_colmap",
+      "sha256": "56cb8682e45648f68c14c0a1907dffb5c987fe0c51e9e1b93760b8ae34fe6a42",
+      "bytes": 124949
+    },
+    {
+      "path": "exports/mesh.obj",
+      "kind": "surface_mesh_obj",
+      "sha256": "b987a7a3fc6ffb1dd17c7599c070747e6700f0da063484acbac1fec82558d6aa",
+      "bytes": 295804
+    },
+    {
+      "path": "exports/mesh.metadata.json",
+      "kind": "surface_provenance",
+      "sha256": "3b7a3315d39fbdaf2cf00de0e066b0143cfa04800a846eff76dc47a49e15f3ca",
+      "bytes": 489
+    }
+  ],
+  "diagnostic": null
+}

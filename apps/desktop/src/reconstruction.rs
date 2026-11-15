@@ -30,6 +30,7 @@ impl Desktop {
             } else {
                 (path, None)
             };
+            self.reconstruction.refine_parent = None;
             self.reconstruction.source_run = Some(source);
             self.reconstruction.clean_revision = revision;
             self.reconstruction.mesh = true;
@@ -166,9 +167,12 @@ impl Desktop {
   match self.pipeline_tab{
    0=>{let busy=self.reconstruction.worker.is_some();if busy{ui.colored_label(p.warning,"Uma execução está ativa. Aguarde ou cancele no passo 2.");}
     ui.add_enabled_ui(!busy,|ui|{
-     ui.heading("Entrada da execução");ui.horizontal(|ui|{if ui.selectable_label(self.reconstruction.source_run.is_none(),"Novas fotografias").clicked(){self.reconstruction.source_run=None;self.reconstruction.clean_revision=None;self.reconstruction.name=self.reconstruction.available_name("reconstrucao");}
+     ui.heading("Entrada da execução");ui.horizontal(|ui|{if ui.selectable_label(self.reconstruction.source_run.is_none()&&self.reconstruction.refine_parent.is_none(),"Novas fotografias").clicked(){self.reconstruction.source_run=None;self.reconstruction.clean_revision=None;self.reconstruction.refine_parent=None;self.reconstruction.name=self.reconstruction.available_name("reconstrucao");}
+      if ui.add_enabled(self.selected_run().is_some(),egui::Button::new("Adicionar fotos ao run selecionado").selected(self.reconstruction.refine_parent.is_some())).clicked(){self.configure_refinement();}
       if ui.add_enabled(self.selected_run().is_some(),egui::Button::new("Continuar run/revisão selecionado")).on_hover_text("Selecione um run ou uma revisão sparse na estrutura.").clicked(){self.configure_selected_run();}});
-     if let Some(source)=&self.reconstruction.source_run{ui.label(format!("Run de origem: {}",source.display()));if let Some(revision)=&self.reconstruction.clean_revision{ui.label(format!("Revisão limpa: {}",revision.display()));}ui.label("A nova superfície reutiliza câmeras e pontos. O run original é preservado.");}
+     if let Some(parent)=&self.reconstruction.refine_parent{ui.label(format!("Run pai: {}",parent.display()));ui.label("Fotos antigas + novas únicas. Reprocessa SfM; não herda limpeza, escala ou transformações do workspace.");if ui.button("Escolher fotos adicionais…").clicked(){self.choose(Purpose::AdditionalImages);}
+if ui.button("Usar fotos adicionais do kit").clicked()&&let Some(path)=kit_path("refinamento/adicionais"){self.reconstruction.additional_images=path;}ui.label(self.reconstruction.additional_images.display().to_string());}
+     else if let Some(source)=&self.reconstruction.source_run{ui.label(format!("Run de origem: {}",source.display()));if let Some(revision)=&self.reconstruction.clean_revision{ui.label(format!("Revisão limpa: {}",revision.display()));}ui.label("A nova superfície reutiliza câmeras e pontos. O run original é preservado.");}
      else{ui.horizontal(|ui|{if ui.button("Escolher fotografias…").clicked(){self.choose(Purpose::Images);}
 if ui.button("Usar fotos do kit").clicked()&&let Some(path)=kit_path("pipeline/fotos"){self.preferences.images=path.clone();self.reconstruction.images=path;self.reconstruction.name=self.reconstruction.available_name("reconstrucao-kit");self.save_preferences();self.notice(Ok(()),"12 fotos sintéticas do kit selecionadas. Você pode prepará-las antes de reconstruir.");}});ui.label(if self.reconstruction.images.as_os_str().is_empty(){"Nenhuma pasta de fotos selecionada".into()}else{self.reconstruction.images.display().to_string()});if ui.add_enabled(self.reconstruction.images.is_dir(),egui::Button::new("Preparar/selecionar imagens…")).clicked(){self.preparation.open=true;}}
      ui.separator();ui.heading("Resultado desejado");let mut mode=(self.reconstruction.dense,self.reconstruction.mesh);egui::ComboBox::from_id_salt("pipeline_mode").selected_text(mode_name(mode)).width(480.).show_ui(ui,|ui|{for value in [(false,false),(false,true),(true,false),(true,true)]{ui.selectable_value(&mut mode,value,mode_name(value));}});self.reconstruction.dense=mode.0;self.reconstruction.mesh=mode.1;
@@ -185,6 +189,7 @@ if let Some(d)=&m.diagnostic{ui.colored_label(p.error,d);}}
    },
    _=>{ui.heading("Resultados da última execução");if let Some(root)=&self.reconstruction.output{ui.label(root.display().to_string());}else{ui.label("Você ainda não executou uma reconstrução nesta sessão.");}
     if ui.add_enabled(self.selected_run().is_some()&&self.reconstruction.worker.is_none(),egui::Button::new("Carregar resultados do run selecionado")).clicked(){self.attach_selected_run();}
+    if ui.button("Comparar revisões / adicionar captura…").clicked(){self.compare_latest_revision();}
     let output=self.reconstruction.output.clone();
     for(file,title,description,sparse,cloud)in[("exports/sparse.ply","Nuvem esparsa","Pontos e câmeras. Você pode editar e gerar uma nova superfície.",true,true),("exports/dense-view.ply","Nuvem densa","Pontos densificados. Limpeza disponível; malha limpa deste fluxo usa sparse.",false,true),("exports/mesh.obj","Superfície 3D","Malha triangular sem textura. Não é um sólido CAD.",false,false)]{
      let available=self.reconstruction.has_artifact(file);egui::Frame::group(ui.style()).show(ui,|ui|{ui.set_min_width(ui.available_width());ui.horizontal(|ui|{ui.strong(title);ui.colored_label(if available{p.success}else{p.secondary},if available{"Disponível"}else{"Não produzido"});});ui.label(description);ui.horizontal(|ui|{

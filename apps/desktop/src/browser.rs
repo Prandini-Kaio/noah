@@ -8,6 +8,11 @@ pub enum Purpose {
     SaveSession,
     Demo,
     Images,
+    AdditionalImages,
+    CompareReference,
+    CompareUpdated,
+    ComparisonReport,
+    ComparisonOpen,
     Engine,
     Output,
     PreparationOutput,
@@ -26,6 +31,11 @@ impl Purpose {
             Self::Demo => "demo",
             Self::ArmourDemo => "armour_demo",
             Self::Images => "images",
+            Self::AdditionalImages => "additional_images",
+            Self::CompareReference => "compare_reference",
+            Self::CompareUpdated => "compare_updated",
+            Self::ComparisonReport => "comparison_report",
+            Self::ComparisonOpen => "comparison_open",
             Self::Engine => "engine",
             Self::Output => "output",
             Self::PreparationOutput => "preparation_output",
@@ -37,6 +47,11 @@ impl Purpose {
     pub fn key_label(key: &str) -> &str {
         match key {
             "images" => "Fotografias",
+            "additional_images" => "Novas fotos da revisão",
+            "compare_reference" => "Run anterior",
+            "compare_updated" => "Run atualizado",
+            "comparison_report" => "Salvar comparação",
+            "comparison_open" => "Reabrir comparação",
             "engine" => "Motor COLMAP",
             "output" => "Resultados da pipeline",
             "preparation_output" => "Preparo de fotos",
@@ -59,6 +74,11 @@ impl Purpose {
             Self::SaveSession => "Salvar nova revisão do workspace",
             Self::Demo => "Criar montagem de exemplo",
             Self::Images => "Escolher pasta de fotografias",
+            Self::AdditionalImages => "Escolher fotos adicionais",
+            Self::CompareReference => "Escolher run anterior",
+            Self::CompareUpdated => "Escolher run atualizado",
+            Self::ComparisonReport => "Salvar comparação",
+            Self::ComparisonOpen => "Reabrir comparação",
             Self::Engine => "Escolher executável COLMAP",
             Self::PreparationOutput => "Pasta de preparo das fotos",
             Self::CleaningOutput => "Pasta de revisões de nuvem",
@@ -73,6 +93,9 @@ impl Purpose {
             self,
             Self::Project
                 | Self::Images
+                | Self::AdditionalImages
+                | Self::CompareReference
+                | Self::CompareUpdated
                 | Self::Output
                 | Self::PreparationOutput
                 | Self::CleaningOutput
@@ -86,6 +109,7 @@ impl Purpose {
                 | Self::ArmourDemo
                 | Self::Export
                 | Self::ExportMeasurements
+                | Self::ComparisonReport
         )
     }
 }
@@ -115,6 +139,7 @@ impl Browser {
                 Purpose::ArmourDemo => "montagem-camadas",
                 Purpose::Export => "peca.obj",
                 Purpose::ExportMeasurements => "medicoes.json",
+                Purpose::ComparisonReport => "comparacao-001.json",
                 _ => "",
             }
             .into(),
@@ -194,9 +219,9 @@ impl Browser {
                                             Purpose::Import => {
                                                 matches!(ext.as_str(), "ply" | "obj")
                                             }
-                                            Purpose::OpenSession | Purpose::SaveSession => {
-                                                ext == "json"
-                                            }
+                                            Purpose::OpenSession
+                                            | Purpose::SaveSession
+                                            | Purpose::ComparisonOpen => ext == "json",
                                             Purpose::Engine => true,
                                             _ => self.purpose.creates(),
                                         };

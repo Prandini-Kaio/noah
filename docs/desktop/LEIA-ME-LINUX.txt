@@ -58,3 +58,6 @@ aproximada e amostragem; não promete geometria oculta ou precisão industrial.
 Guia atual: UX-GUIA.md. Preparação/limpeza: PREPARO-LIMPEZA.md.
 Código MIT; exemplos CC0. Licenças de dependências em third-party-licenses.
 https://github.com/Prandini-Kaio/noah
+
+E6: Comparar… → Usar comparação pronta do kit permite testar sem COLMAP.
+Veja E6-GUIA.md para adicionar fotos e comparar revisões preservando o run pai.

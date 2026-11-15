@@ -16,6 +16,8 @@ photos-audit <fotos>\n\
 photos-prepare <fotos> <novo-preparo> [--max-size <pixels>]\n\
 cloud-clean <fonte.ply-ou-run> <nova-revisao> --sor <k> <sigma> | --radius <raio> <min-vizinhos>\n\
 mesh-from-clean <revisao-limpa> <novo-run> --colmap <executável>\n\
+refine-run <pai> <fotos-adicionais> <novo-run> --colmap <executável> [--mesh]\n\
+compare-runs <anterior> <atual> <novo-relatorio.json> [--threshold <u-referencia>]\n\
 run-inspect <run>\n\
 run-cancel <run>\n\
 Ângulos em radianos, Euler XYZ; transform substitui a transformação da instância.\n\
@@ -32,6 +34,43 @@ fn run(args: &[String]) -> Result<()> {
         return Ok(());
     }
     match args[0].as_str() {
+        "refine-run" if args.len() == 6 || args.len() == 7 => {
+            if args[4] != "--colmap" || args.len() == 7 && args[6] != "--mesh" {
+                return Err("use --colmap executável [--mesh]".into());
+            }
+            noah_photogrammetry::refinement::refine(
+                Path::new(&args[1]),
+                noah_photogrammetry::Config {
+                    images: args[2].clone().into(),
+                    output: args[3].clone().into(),
+                    engine: args[5].clone().into(),
+                    dense: false,
+                    mesh: args.len() == 7,
+                    timeout: std::time::Duration::from_secs(600),
+                },
+            )?;
+            println!("nova revisão em {}", args[3]);
+        }
+        "compare-runs" if args.len() == 4 || args.len() == 6 => {
+            let threshold = if args.len() == 6 {
+                if args[4] != "--threshold" {
+                    return Err("opção inválida".into());
+                }
+                args[5].parse()?
+            } else {
+                0.
+            };
+            let c = noah_photogrammetry::comparison::compare(
+                Path::new(&args[1]),
+                Path::new(&args[2]),
+                threshold,
+            )?;
+            noah_photogrammetry::comparison::save(&c, Path::new(&args[3]))?;
+            println!(
+                "{} câmeras comuns; RMS atual→anterior={} u. de referência; relatório salvo",
+                c.report.registration.common_images, c.report.updated_to_reference.rms
+            );
+        }
         "photos-audit" if args.len() == 2 => {
             let audit = noah_photogrammetry::preparation::analyze(Path::new(&args[1]))?;
             println!("{}", serde_json::to_string_pretty(&audit)?);

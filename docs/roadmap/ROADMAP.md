@@ -92,3 +92,12 @@ resultado e desmontagem. Camadas/armadura preservam fronteiras da hierarquia;
 painéis rígidos e estilhaços permanecem separados. Exemplo aninhado de 13 peças.
 Sessão 8 lê 1–7; relatório 4; preferências locais schema 1. Não conclui CAD,
 texturização, multissensor ou dense GPU. Evidências: UX-FLUXO-REPORT.md.
+
+## E6 inicial — 2026-11-15
+Autorizados resumo de pendências e próxima etapa. Novas fotos originam novo SfM
+com deduplicação SHA e proveniência; comparação sparse usa câmeras comuns,
+similaridade positiva, residual e distâncias bidirecionais amostradas. Interface,
+CLI e kit 10+2 com dois runs reais prontos. Sem herança de edição/calibração.
+Ainda pendem E2 GPU/textura/qualidade; E4 primitivas/validação física; E5
+rotação/ICP/instâncias; E6 incremental/revisões editadas; E7 sensores e E8 CAD.
+Plano E6-REVISOES.md, decisão 0014 e relatório ../quality/E6-REPORT.md.

@@ -90,6 +90,32 @@ impl Job {
         parameters: BTreeMap<String, String>,
         timeout: Duration,
     ) -> Result<Self> {
+        Self::create_internal(root, images, engine, parameters, timeout, None)
+    }
+    /// Snapshot an explicit bounded list; used by capture revisions from multiple sources.
+    pub fn create_from_paths(
+        root: &Path,
+        images: &[PathBuf],
+        engine: &Path,
+        parameters: BTreeMap<String, String>,
+        timeout: Duration,
+    ) -> Result<Self> {
+        let directory = images
+            .first()
+            .and_then(|p| p.parent())
+            .ok_or("lista de fotos vazia")?;
+        let mut parameters = parameters;
+        parameters.insert("input_selection".into(), "explicit_file_list".into());
+        Self::create_internal(root, directory, engine, parameters, timeout, Some(images))
+    }
+    fn create_internal(
+        root: &Path,
+        images: &Path,
+        engine: &Path,
+        parameters: BTreeMap<String, String>,
+        timeout: Duration,
+        selected: Option<&[PathBuf]>,
+    ) -> Result<Self> {
         if timeout.is_zero() || timeout > Duration::from_secs(86400) {
             return Err("timeout deve estar entre 1 ms e 24h".into());
         }
@@ -137,7 +163,7 @@ impl Job {
             .parameters
             .insert("timeout_ms".into(), timeout.as_millis().to_string());
         job.save()?;
-        if let Err(error) = job.snapshot(images) {
+        if let Err(error) = job.snapshot(images, selected) {
             job.fail(&error.to_string())?;
             return Err(error);
         }
@@ -149,20 +175,38 @@ impl Job {
     pub fn manifest(&self) -> &Manifest {
         &self.manifest
     }
-    fn snapshot(&mut self, images: &Path) -> Result<()> {
+    fn snapshot(&mut self, images: &Path, selected: Option<&[PathBuf]>) -> Result<()> {
         let mut paths = Vec::new();
-        for entry in fs::read_dir(images)? {
-            let path = entry?.path();
-            let ext = path
-                .extension()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_ascii_lowercase();
-            if matches!(ext.as_str(), "jpg" | "jpeg" | "png") {
-                regular(&path)?;
-                paths.push(path);
-                if paths.len() > 500 {
-                    return Err("máximo de 500 imagens por run".into());
+        if let Some(selected) = selected {
+            if selected.len() > 500 {
+                return Err("máximo de 500 imagens por run".into());
+            }
+            for path in selected {
+                regular(path)?;
+                let ext = path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                if !matches!(ext.as_str(), "jpg" | "jpeg" | "png") {
+                    return Err("lista explícita exige JPEG/PNG".into());
+                }
+                paths.push(path.clone());
+            }
+        } else {
+            for entry in fs::read_dir(images)? {
+                let path = entry?.path();
+                let ext = path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                if matches!(ext.as_str(), "jpg" | "jpeg" | "png") {
+                    regular(&path)?;
+                    paths.push(path);
+                    if paths.len() > 500 {
+                        return Err("máximo de 500 imagens por run".into());
+                    }
                 }
             }
         }

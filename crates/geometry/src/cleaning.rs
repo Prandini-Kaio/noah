@@ -279,3 +279,76 @@ mod degenerate_tests {
         assert!(radius(&c, &active, 0.1, 16).unwrap().iter().all(|&v| !v));
     }
 }
+
+/// Reusable exact nearest-neighbour index, without excluding coincident query points.
+pub struct NearestIndex<'a> {
+    points: &'a [[f64; 3]],
+    tree: Box<Node>,
+}
+impl<'a> NearestIndex<'a> {
+    pub fn new(points: &'a [[f64; 3]]) -> Result<Self> {
+        if points.is_empty()
+            || points.len() > MAX_CLEAN_POINTS
+            || points
+                .iter()
+                .flatten()
+                .any(|v| !v.is_finite() || v.abs() > 1e12)
+        {
+            return Err("índice exige 1–200 mil pontos válidos");
+        }
+        let mut ids: Vec<_> = (0..points.len()).collect();
+        Ok(Self {
+            points,
+            tree: Node::build(&mut ids, points, 0).ok_or("índice vazio")?,
+        })
+    }
+    pub fn distance(&self, p: [f64; 3]) -> Result<f64> {
+        if p.iter().any(|v| !v.is_finite() || v.abs() > 1e12) {
+            return Err("consulta fora dos limites");
+        }
+        let mut best = f64::INFINITY;
+        self.tree.external(self.points, p, &mut best);
+        Ok(best.sqrt())
+    }
+}
+impl Node {
+    fn external(&self, points: &[[f64; 3]], p: [f64; 3], best: &mut f64) {
+        let q = points[self.index];
+        let d = (0..3).map(|a| (p[a] - q[a]).powi(2)).sum::<f64>();
+        *best = best.min(d);
+        let delta = p[self.axis] - q[self.axis];
+        let (near, far) = if delta <= 0. {
+            (&self.left, &self.right)
+        } else {
+            (&self.right, &self.left)
+        };
+        if let Some(n) = near {
+            n.external(points, p, best);
+        }
+        if delta * delta < *best
+            && let Some(n) = far
+        {
+            n.external(points, p, best);
+        }
+    }
+}
+#[cfg(test)]
+mod nearest_tests {
+    use super::*;
+    #[test]
+    fn agrees_with_bruteforce_and_coincidence() {
+        let points: Vec<_> = (0..83)
+            .map(|i| [(i * 13 % 47) as f64, (i * 3 % 19) as f64, (i % 7) as f64])
+            .collect();
+        let index = NearestIndex::new(&points).unwrap();
+        for i in 0..120 {
+            let p = [i as f64 * 0.25, 0.31, 2.5];
+            let expected = points
+                .iter()
+                .map(|q| (0..3).map(|a| (p[a] - q[a]).powi(2)).sum::<f64>().sqrt())
+                .fold(f64::INFINITY, f64::min);
+            assert!((index.distance(p).unwrap() - expected).abs() < 1e-12);
+        }
+        assert_eq!(index.distance(points[0]).unwrap(), 0.);
+    }
+}
